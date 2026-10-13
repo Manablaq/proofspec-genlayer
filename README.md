@@ -6,9 +6,11 @@ ProofSpec is a GenLayer-native application for proving whether a software releas
 
 ## Progress
 
-`PROOFSPEC_PROGRESS=1/7_SPECIFICATION_FROZEN`
+`PROOFSPEC_PROGRESS=2/7_BACKEND_STATIC_CERTIFIED`
 
 Progress 1 freezes the product, contract, evidence, consensus, threat, reviewer-matrix, release-gate, and network-target specifications before implementation.
+
+Progress 2 implements the single Intelligent Contract backend and passes the pinned local syntax, GenVM type/static, deterministic, and static-guard certification gates. Direct Mode consensus certification remains Progress 3.
 
 No Intelligent Contract, frontend application, dependency set, deployment, funding operation, signing operation, or blockchain write is authorized by this checkpoint.
 
