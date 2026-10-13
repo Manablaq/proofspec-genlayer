@@ -161,6 +161,7 @@ def seed_directional_evaluated_spec(
         "criterion_id": 1,
         "source_role": module.PRIMARY,
         "status": module.EVIDENCE_AVAILABLE,
+        "source_status": module.SOURCE_AVAILABLE,
         "url": criterion_record["primary_url"],
         "host": criterion_record["primary_host"],
         "snapshot_id": module._snapshot_id(
@@ -184,6 +185,7 @@ def seed_directional_evaluated_spec(
     )
     criterion_record["primary_version_status"] = module.VERSION_NOT_APPLICABLE
     criterion_record["primary_evidence_status"] = module.EVIDENCE_AVAILABLE
+    criterion_record["primary_source_status"] = module.SOURCE_AVAILABLE
     criterion_record["primary_snapshot_id"] = snapshot["snapshot_id"]
     criterion_record["primary_content_sha256"] = digest
     criterion_record["primary_content_length"] = len(content)
@@ -210,6 +212,15 @@ def test_protocol_info_freezes_core_limits_and_outcomes():
         module.INSUFFICIENT,
     ]
     assert info["max_criteria"] == 5
+    assert info["source_statuses"] == [
+        module.SOURCE_AVAILABLE,
+        module.SOURCE_UNAVAILABLE,
+        module.SOURCE_STALE,
+        module.SOURCE_IRRELEVANT,
+        module.SOURCE_AMBIGUOUS,
+        module.SOURCE_INADMISSIBLE,
+        module.SOURCE_NOT_APPLICABLE,
+    ]
     assert info["max_source_text_chars"] == 8000
     assert info["max_challenges_per_spec"] == 8
     assert env.nondet_calls == 0
@@ -481,6 +492,7 @@ def test_snapshot_identity_is_context_bound_and_independently_verifiable():
         "criterion_id": 2,
         "source_role": module.PRIMARY,
         "status": module.EVIDENCE_AVAILABLE,
+        "source_status": module.SOURCE_AVAILABLE,
         "url": "https://evidence.example/release",
         "host": "evidence.example",
         "snapshot_id": snapshot_id,
@@ -509,6 +521,7 @@ def test_snapshot_verification_rejects_tampered_content():
         "criterion_id": 1,
         "source_role": module.PRIMARY,
         "status": module.EVIDENCE_AVAILABLE,
+        "source_status": module.SOURCE_AVAILABLE,
         "url": "https://evidence.example/release",
         "host": "evidence.example",
         "snapshot_id": module._snapshot_id(
@@ -711,3 +724,106 @@ def test_get_criterion_rejects_out_of_range_id():
     spec_id = create_default_spec(contract, module)
     with pytest.raises(StubUserError, match="Criterion does not exist"):
         contract.get_criterion(spec_id, 2)
+
+
+def test_nonempty_short_release_ref_and_requirement_are_allowed():
+    module, _env, contract = make_contract()
+    spec_id = contract.create_spec(
+        "R",
+        "x",
+        criteria_json(
+            criterion(
+                requirement="y",
+                primary_url="https://short.example/evidence",
+            )
+        ),
+    )
+    spec = contract.get_spec(spec_id)
+    assert spec["release_ref"] == "x"
+    assert spec["criteria"][0]["requirement"] == "y"
+
+
+def test_empty_release_ref_and_requirement_remain_invalid():
+    module, _env, contract = make_contract()
+    with pytest.raises(StubUserError, match="Release reference is required"):
+        contract.create_spec("Release", "   ", criteria_json(criterion()))
+
+    with pytest.raises(StubUserError, match="Criterion requirement is required"):
+        contract.create_spec(
+            "Release",
+            "x",
+            criteria_json(criterion(requirement="   ")),
+        )
+
+
+def test_frozen_source_status_taxonomy_maps_fail_closed_conditions():
+    module, _env = load_contract()
+
+    assert module._derive_source_status(
+        module.EVIDENCE_AVAILABLE,
+        module.SUPPORTS,
+        module.FRESHNESS_NOT_REQUIRED_V1,
+        module.VERSION_NOT_APPLICABLE,
+    ) == module.SOURCE_AVAILABLE
+
+    assert module._derive_source_status(
+        module.EVIDENCE_UNAVAILABLE,
+        module.UNAVAILABLE,
+        module.FRESHNESS_NOT_REQUIRED_V1,
+        module.VERSION_UNVERIFIABLE,
+    ) == module.SOURCE_UNAVAILABLE
+
+    assert module._derive_source_status(
+        module.EVIDENCE_AVAILABLE,
+        module.SUPPORTS,
+        module.FRESHNESS_RELEASE_BOUND_V1,
+        module.VERSION_MISMATCHES_RELEASE,
+    ) == module.SOURCE_STALE
+
+    assert module._derive_source_status(
+        module.EVIDENCE_AVAILABLE,
+        module.IRRELEVANT,
+        module.FRESHNESS_NOT_REQUIRED_V1,
+        module.VERSION_NOT_APPLICABLE,
+    ) == module.SOURCE_IRRELEVANT
+
+    assert module._derive_source_status(
+        module.EVIDENCE_AVAILABLE,
+        module.SUPPORTS,
+        module.FRESHNESS_RELEASE_BOUND_V1,
+        module.VERSION_UNVERIFIABLE,
+    ) == module.SOURCE_AMBIGUOUS
+
+    assert module._derive_source_status(
+        module.EVIDENCE_TOO_LARGE,
+        module.CONTENT_TOO_LARGE,
+        module.FRESHNESS_NOT_REQUIRED_V1,
+        module.VERSION_UNVERIFIABLE,
+    ) == module.SOURCE_INADMISSIBLE
+
+
+def test_utf8_commitment_uses_bytes_while_content_bound_uses_characters():
+    module, _env = load_contract()
+    content = "évidence"
+    digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    evidence = {
+        "spec_id": 1,
+        "criterion_id": 1,
+        "source_role": module.PRIMARY,
+        "status": module.EVIDENCE_AVAILABLE,
+        "source_status": module.SOURCE_AVAILABLE,
+        "url": "https://unicode.example/release",
+        "host": "unicode.example",
+        "snapshot_id": module._snapshot_id(
+            1, 1, module.PRIMARY, "https://unicode.example/release", digest
+        ),
+        "content_sha256": digest,
+        "content_length": len(content),
+        "content": content,
+    }
+    assert len(content.encode("utf-8")) > len(content)
+    assert module._valid_evidence_candidate(evidence)
+    snapshot = module._snapshot_record(evidence)
+    assert snapshot["content_length"] == len(content)
+    assert snapshot["content_sha256"] == digest
+    assert snapshot["source_status"] == module.SOURCE_AVAILABLE

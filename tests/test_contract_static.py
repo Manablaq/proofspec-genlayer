@@ -195,3 +195,28 @@ def test_no_hard_coded_network_or_contract_identity_in_contract_source():
     )
     for token in forbidden:
         assert token not in SOURCE
+
+
+def test_frozen_source_status_taxonomy_is_explicit_and_public():
+    required = (
+        'SOURCE_AVAILABLE = "AVAILABLE"',
+        'SOURCE_UNAVAILABLE = "UNAVAILABLE"',
+        'SOURCE_STALE = "STALE"',
+        'SOURCE_IRRELEVANT = "IRRELEVANT"',
+        'SOURCE_AMBIGUOUS = "AMBIGUOUS"',
+        'SOURCE_INADMISSIBLE = "INADMISSIBLE"',
+        '"source_statuses": [',
+        '"primary_source_status"',
+        '"corroborating_source_status"',
+        '"counter_source_status"',
+    )
+    for token in required:
+        assert token in SOURCE
+
+
+def test_no_unfrozen_minimum_length_restrictions_remain():
+    assert "MIN_REQUIREMENT_CHARS" not in SOURCE
+    assert "Release reference is too short" not in SOURCE
+    assert "Criterion requirement is too short" not in SOURCE
+    assert "Release reference is required" in SOURCE
+    assert "Criterion requirement is required" in SOURCE

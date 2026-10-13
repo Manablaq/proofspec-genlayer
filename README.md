@@ -6,13 +6,17 @@ ProofSpec is a GenLayer-native application for proving whether a software releas
 
 ## Progress
 
-`PROOFSPEC_PROGRESS=2/7_BACKEND_STATIC_CERTIFIED`
+`PROOFSPEC_PROGRESS=3/7_DIRECT_MODE_CONSENSUS_CERTIFIED`
 
 Progress 1 freezes the product, contract, evidence, consensus, threat, reviewer-matrix, release-gate, and network-target specifications before implementation.
 
-Progress 2 implements the single Intelligent Contract backend and passes the pinned local syntax, GenVM type/static, deterministic, and static-guard certification gates. Direct Mode consensus certification remains Progress 3.
+Progress 2 implements the single Intelligent Contract backend and passes the pinned local syntax, GenVM type/static, deterministic, and static-guard certification gates.
 
-No Intelligent Contract, frontend application, dependency set, deployment, funding operation, signing operation, or blockchain write is authorized by this checkpoint.
+Progress 3 certifies the frozen contract in GenLayer Direct Mode with strict mock tracking, pickling validation, leader/validator agreement and disagreement paths, evidence-identity checks, freshness/version checks, and authenticated-snapshot challenge behavior.
+
+Before Progress 3 promotion, the implementation was reconciled against the frozen Progress 1 specification and corrected to expose the full frozen source-status taxonomy and remove implementation-only minimum-length restrictions. The corrected contract was re-certified through both the Progress 2 and Progress 3 local gates.
+
+The Intelligent Contract backend is implemented and Direct Mode certified. Frontend work and hosted-network deployment remain pending. No Studio-dev deployment, Bradbury deployment, funding operation, signing operation, or blockchain write has been performed by this checkpoint.
 
 ## Core result model
 
@@ -73,6 +77,6 @@ Studio-dev is treated as temporary release-candidate infrastructure. Bradbury is
 
 ## Safety boundary
 
-This repository checkpoint is a specification freeze only.
+This repository checkpoint includes the frozen specification, the statically certified backend, and local Direct Mode consensus certification.
 
-Any later contract implementation, dependency addition, frontend implementation, deployment, funding, signing, blockchain write, Vercel mutation, environment-variable mutation, domain mutation, Git history rewrite, or release promotion requires its own scoped gate and authorization.
+Any later frontend implementation, deployment, funding, signing, blockchain write, Vercel mutation, environment-variable mutation, domain mutation, Git history rewrite, or release promotion requires its own scoped gate and authorization.
