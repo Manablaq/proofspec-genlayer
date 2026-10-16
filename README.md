@@ -4,19 +4,15 @@
 
 ProofSpec is a GenLayer-native application for proving whether a software release satisfies a bounded, human-readable specification using versioned public evidence, validator consensus, immutable evidence snapshots, and challengeable certificates.
 
-## Progress
+## Progress — Studio Next live checkpoint (2026-10-16)
 
-`PROOFSPEC_PROGRESS=3/7_DIRECT_MODE_CONSENSUS_CERTIFIED`
+`PROOFSPEC_STUDIO_NEXT_LIVE=FINALIZED_CERTIFIED`; `PROOFSPEC_BRADBURY_CERTIFICATION=NOT_PERFORMED`.
 
-Progress 1 freezes the product, contract, evidence, consensus, threat, reviewer-matrix, release-gate, and network-target specifications before implementation.
+The frozen single Intelligent Contract has passed backend static tests and Direct Mode consensus certification. The locally developed frontend passed its earlier mock-RPC unit and browser tests; the final security-patched frontend release requires fresh checks and production deployment confirmation.
 
-Progress 2 implements the single Intelligent Contract backend and passes the pinned local syntax, GenVM type/static, deterministic, and static-guard certification gates.
+On Studio Next (Studio Devnet family, chain 61997), contract `0xD11A506B363E131e8fA3eBeC28a21cC8a4375110` successfully finalized deployment, `create_spec(1)`, and `evaluate_spec(1)`. The latter achieved `MAJORITY_AGREE`, `FINISHED_WITH_RETURN`, `CERTIFIED`, a `SATISFIED` criterion and an independently verified primary evidence snapshot. See `docs/PROGRESS_5_6_STUDIO_NEXT_CERTIFICATION_2026-10-16.md`.
 
-Progress 3 certifies the frozen contract in GenLayer Direct Mode with strict mock tracking, pickling validation, leader/validator agreement and disagreement paths, evidence-identity checks, freshness/version checks, and authenticated-snapshot challenge behavior.
-
-Before Progress 3 promotion, the implementation was reconciled against the frozen Progress 1 specification and corrected to expose the full frozen source-status taxonomy and remove implementation-only minimum-length restrictions. The corrected contract was re-certified through both the Progress 2 and Progress 3 local gates.
-
-The Intelligent Contract backend is implemented and Direct Mode certified. Frontend work and hosted-network deployment remain pending. No Studio-dev deployment, Bradbury deployment, funding operation, signing operation, or blockchain write has been performed by this checkpoint.
+**Submission scope:** The owner elected to proceed **without Bradbury testing**. This is a deliberate departure from the frozen persistent Bradbury gate and 12-write reviewer matrix; those requirements are **not complete** and reviewer acceptance cannot be guaranteed. See `docs/STUDIO_NEXT_ONLY_SUBMISSION_SCOPE.md`. No new Intelligent Contract or blockchain transactions are requested by this release.
 
 ## Core result model
 
@@ -77,6 +73,6 @@ Studio-dev is treated as temporary release-candidate infrastructure. Bradbury is
 
 ## Safety boundary
 
-This repository checkpoint includes the frozen specification, the statically certified backend, and local Direct Mode consensus certification.
+The committed repository remains at Progress 3. The present uncommitted candidate additionally includes the locally certified Progress 4 frontend. That local certification does not establish hosted-network finality or reviewer readiness.
 
 Any later frontend implementation, deployment, funding, signing, blockchain write, Vercel mutation, environment-variable mutation, domain mutation, Git history rewrite, or release promotion requires its own scoped gate and authorization.
