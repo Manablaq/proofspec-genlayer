@@ -1,78 +1,94 @@
 # ProofSpec
 
-**Semantic release certification on GenLayer.**
+**Consensus-backed, challengeable software release certification on GenLayer.** ProofSpec evaluates bounded release requirements against public evidence, records validator-agreed outcomes, and preserves authenticated evidence snapshots for later inspection.
 
-ProofSpec is a GenLayer-native application for proving whether a software release satisfies a bounded, human-readable specification using versioned public evidence, validator consensus, immutable evidence snapshots, and challengeable certificates.
+**Live application:** https://proofspec-genlayer.vercel.app
 
-## Progress — Studio Next live checkpoint (2026-10-16)
+**Verified frontend release:** [`62589f216adc3041c2f88b65191cd5afd12c7f5d`](https://github.com/Manablaq/proofspec-genlayer/tree/62589f216adc3041c2f88b65191cd5afd12c7f5d)
 
-`PROOFSPEC_STUDIO_NEXT_LIVE=FINALIZED_CERTIFIED`; `PROOFSPEC_BRADBURY_CERTIFICATION=NOT_PERFORMED`.
+**Network:** Studio Next / Studio Devnet (`studio-dev`), chain ID `61997`
 
-The frozen single Intelligent Contract has passed backend static tests and Direct Mode consensus certification. The locally developed frontend passed its earlier mock-RPC unit and browser tests; the final security-patched frontend release requires fresh checks and production deployment confirmation.
+**Intelligent Contract:** `0xD11A506B363E131e8fA3eBeC28a21cC8a4375110`
 
-On Studio Next (Studio Devnet family, chain 61997), contract `0xD11A506B363E131e8fA3eBeC28a21cC8a4375110` successfully finalized deployment, `create_spec(1)`, and `evaluate_spec(1)`. The latter achieved `MAJORITY_AGREE`, `FINISHED_WITH_RETURN`, `CERTIFIED`, a `SATISFIED` criterion and an independently verified primary evidence snapshot. See `docs/PROGRESS_5_6_STUDIO_NEXT_CERTIFICATION_2026-10-16.md`.
+**RPC:** `https://studio-next.genlayer.com/api`
 
-**Submission scope:** The owner elected to proceed **without Bradbury testing**. This is a deliberate departure from the frozen persistent Bradbury gate and 12-write reviewer matrix; those requirements are **not complete** and reviewer acceptance cannot be guaranteed. See `docs/STUDIO_NEXT_ONLY_SUBMISSION_SCOPE.md`. No new Intelligent Contract or blockchain transactions are requested by this release.
+> **Scope:** This is a verified Studio Next release-candidate demonstration, **not** a completed Bradbury certification or full seven-gate release. The planned 12-write reviewer matrix has not been executed. Studio Devnet state may reset. Production frontend wallet writes have not been certified.
 
-## Core result model
+## Verified milestones
 
-A ProofSpec release certificate has one of three effective outcomes:
+| Layer | Verified result | Boundary |
+| --- | --- | --- |
+| Intelligent Contract | Frozen source certified by earlier static/backend and Direct Mode tests | Those local tests do not themselves prove live execution |
+| Studio Next lifecycle | Deployed contract, created specification 1, finalized one successful evaluation | Only the live `CERTIFIED` scenario is demonstrated |
+| Evidence authentication | Snapshot verification returned `true`; independent content SHA-256 matched | State is held on a development preview network |
+| Production frontend | Vercel deployment `dpl_HbNcTkeH1C66KUKrVpAFzosHzHqh` reached `READY` on the exact release commit | Deployment alone does not prove wallet-write functionality |
+| Public HTTP | `/`, `/api/runtime-config`, and `/spec/1` returned HTTP 200 | HTTP 200 alone does not prove live contract reads |
+| Live browser guest reads | Chromium, Firefox, and WebKit each passed real finalized certificate and snapshot inspection | No browser wallet signing or blockchain writes were performed |
 
-- `CERTIFIED` — every required criterion is supported by admissible evidence.
-- `REJECTED` — at least one required criterion is positively contradicted by admissible evidence and no criterion is unresolved.
-- `INSUFFICIENT` — evidence is unavailable, stale, conflicting, inadmissible, ambiguous, or validator consensus cannot safely support a directional result.
+The latest read-only checkpoint on Studio Next reported **one** specification, **zero** challenges, specification 1 `EVALUATED` at revision `1`, effective certificate `CERTIFIED`, criterion 1 `SATISFIED`, and primary evidence `AVAILABLE`.
 
-Criterion-level results are:
+For exact verification results see the [Production Release Verification](docs/PRODUCTION_RELEASE_VERIFICATION_2026-10-16.md). For transaction identities and hash provenance see the [Reviewer Evidence Index](docs/REVIEWER_EVIDENCE_INDEX_2026-10-16.md).
 
-- `SATISFIED`
-- `VIOLATED`
-- `INSUFFICIENT`
+## How certification works
 
-The overall result is derived deterministically from validator-agreed criterion results. An LLM never directly chooses the stored overall certificate status.
+ProofSpec accepts up to five required criteria per specification. Each criterion has one HTTPS primary source and optionally a corroborating source. GenLayer validators assess bounded public evidence and compare decision-critical semantic results using the Equivalence Principle. Contract logic derives the overall certificate deterministically:
 
-## Why GenLayer
+| Result | Meaning |
+| --- | --- |
+| `CERTIFIED` | Every required criterion is supported by admissible evidence. |
+| `REJECTED` | A criterion is positively contradicted and none remains unresolved. |
+| `INSUFFICIENT` | Evidence or consensus cannot justify a directional verdict. |
 
-Release certification depends on semantic interpretation of public web evidence such as immutable repository files, release notes, deployment records, technical documentation, and other versioned sources. These inputs cannot be reduced to a conventional deterministic oracle value without losing the reasoning step.
+Criteria individually resolve to `SATISFIED`, `VIOLATED`, or `INSUFFICIENT`. Available evidence is held in SHA-256-authenticated snapshots. Challenges retain original authenticated evidence so later source drift cannot silently rewrite the prior decision. These behaviors have local test coverage; the complete live challenge matrix has **not** been demonstrated.
 
-ProofSpec uses GenLayer Intelligent Contract non-determinism for independent web retrieval and semantic classification, then applies the Equivalence Principle to stable decision fields before deterministic contract logic derives the certificate.
+## View the live certificate without a wallet
 
-## v1 scope
+1. Visit [ProofSpec](https://proofspec-genlayer.vercel.app).
+2. Check that the network indicator shows Studio Devnet / chain `61997` and the recorded checkpoint counts are one specification and zero challenges.
+3. Open certificate **1**. The previously verified state is `EVALUATED`, revision `1`, `CERTIFIED`, with criterion 1 `SATISFIED`.
+4. Choose **Inspect** for the primary evidence snapshot. The authenticated snapshot panel should show `VERIFIED` and its recorded SHA-256 digest.
 
-v1 intentionally uses one Intelligent Contract and a bounded evidence model:
+These steps are read-only. Do not connect a wallet, create another specification, retry an earlier transaction, or file a challenge merely to reproduce the evidence. If Studio Devnet has reset, report state drift rather than fabricating continuity.
 
-- up to 5 required criteria per specification;
-- one primary evidence source per criterion;
-- one optional corroborating source per criterion;
-- HTTPS-only evidence;
-- versioned or immutable sources preferred;
-- bounded content snapshots with SHA-256 commitments;
-- one pending challenge per specification;
-- at most 8 challenges per specification;
-- challenge evidence must use a new source host;
-- original authenticated evidence remains the decision basis during challenge resolution;
-- mutable-source drift is recorded explicitly rather than silently replacing original evidence.
+## Local frontend development
 
-## Release path
+Use Node.js `24.x` and the committed npm lockfile. The verified frontend release pins Next.js `16.4.2`, React `19.3.1`, and `genlayer-js` `2.0.0-rc.1`.
 
-The planned certification path is:
+```bash
+cd frontend
+npm ci
+cp .env.example .env.local
+npm run typecheck
+npm run lint
+npm run test:unit
+npm run build
+npm run dev
+```
 
-`Direct Mode -> Studio-dev release-candidate validation -> Bradbury persistent live certification -> production frontend`
+`npm run test:e2e` runs the **local mocked-RPC** Playwright suite after a production build. It must not be confused with the separate real production Chromium/Firefox/WebKit guest-read tests recorded in the release report. Local test fixture actions do not prove live wallet signing.
 
-Studio-dev is treated as temporary release-candidate infrastructure. Bradbury is the persistent production-like testnet used for the final live reviewer matrix.
+Never commit `.env.local`, passwords, wallet keys, private tokens, generated builds, or raw operator journals.
 
-## Specification documents
+## Production environment reference
 
-- `docs/PRODUCT_SPEC.md`
-- `docs/CONTRACT_SPEC.md`
-- `docs/EVIDENCE_MODEL.md`
-- `docs/CONSENSUS_SPEC.md`
-- `docs/THREAT_MODEL.md`
-- `docs/REVIEWER_MATRIX.md`
-- `docs/RELEASE_GATES.md`
-- `docs/NETWORK_TARGETS.md`
+The Vercel project `proofspec-genlayer` uses framework **Next.js** and project root directory **`frontend`**. Its production runtime is configured with:
 
-## Safety boundary
+```dotenv
+PROOFSPEC_NETWORK=studio-dev
+PROOFSPEC_RPC_URL=https://studio-next.genlayer.com/api
+PROOFSPEC_CONTRACT_ADDRESS=0xD11A506B363E131e8fA3eBeC28a21cC8a4375110
+```
 
-The committed repository remains at Progress 3. The present uncommitted candidate additionally includes the locally certified Progress 4 frontend. That local certification does not establish hosted-network finality or reviewer readiness.
+`PROOFSPEC_E2E_MOCK` must remain **unset** in production. The published runtime configuration returned `configured: true`, `mockMode: false`, and chain ID `61997`. These are public routing values, not wallet credentials.
 
-Any later frontend implementation, deployment, funding, signing, blockchain write, Vercel mutation, environment-variable mutation, domain mutation, Git history rewrite, or release promotion requires its own scoped gate and authorization.
+## Documentation
+
+Start with the [Documentation Guide](docs/DOCUMENTATION_GUIDE.md). The frozen [Product](docs/PRODUCT_SPEC.md), [Contract](docs/CONTRACT_SPEC.md), [Consensus](docs/CONSENSUS_SPEC.md), [Evidence](docs/EVIDENCE_MODEL.md), and [Threat Model](docs/THREAT_MODEL.md) documents explain the design. The [Reviewer Matrix](docs/REVIEWER_MATRIX.md) and [Release Gates](docs/RELEASE_GATES.md) define **original requirements**, not claims those requirements were completed.
+
+The [Studio Next-only Submission Decision](docs/STUDIO_NEXT_ONLY_SUBMISSION_SCOPE.md) documents the deliberate scope limitation. The [R7 Production Release Verification](docs/PRODUCTION_RELEASE_VERIFICATION_2026-10-16.md) and [Reviewer Evidence Index](docs/REVIEWER_EVIDENCE_INDEX_2026-10-16.md) describe evidence actually obtained later.
+
+## Explicit limits and release discipline
+
+There is **no** completed Bradbury chain `4221` reviewer certification, no verified four-spec/two-challenge/12-write live matrix, no live `REJECTED` or `INSUFFICIENT` release verdict, no live `REJECTED` or `UPHELD` challenge, and no real-wallet production browser write certification. Reviewer acceptance is not guaranteed.
+
+Historical reports remain date-specific records and must not be silently rewritten. This documentation update is prepared separately from the verified R7 deployment; it does not authorize contract, wallet, blockchain, Vercel, security-audit or checker modifications. **Do not mark `PROOFSPEC_RELEASE_COMPLETE=YES` or formal Progress 7/7 complete.**
