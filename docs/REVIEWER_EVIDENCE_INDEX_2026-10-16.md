@@ -56,9 +56,9 @@ The dated Studio Next certification checkpoint records the following operator-lo
 - `~/Downloads/PROOFSPEC_P6_18H_SINGLE_SEND_JOURNAL.jsonl`
 - `~/Downloads/PROOFSPEC_P6_19_READONLY_FINALITY_EVIDENCE/`
 
-Original journal bytes, local R5/R7 terminal transcripts, file sizes, original file SHA-256s, and sanitization results are **not available in this committed source index**. Their absence is explicit: **no fabricated hashes, missing file attachments, or invented GitHub archival links.**
+Original journal bytes and local R5/R7 terminal transcripts remain **unpublished**. The verified metadata-only [R8F evidence index ZIP](evidence/proofspec_r8f_sanitized_evidence_index.zip) contains the 29 original relative filenames, file sizes, and SHA-256 hashes. Its ZIP SHA-256 is `323a5409c454c68c33eec8b94b427781324dcdc3e6122eb917560af452c29f18` (7,093 bytes). This ZIP contains **no raw RPC requests/responses, execution journal bodies, or secrets**; it is not independent proof of the original execution or a sanitized release of the raw evidence. R8E source verification, R8G package verification, and R8H disclosure audit are operator-side checks, not independent reviewer certification.
 
-Before publication, collect copies of the original bytes without editing originals; inventory and hash the originals; inspect for wallet secrets/tokens; sanitize **new copies**; independently hash the sanitized package and publish its separate digest manifest only after verifying it. Redacted copies necessarily have different hashes than originals. Do not upload or reveal unreviewed operator journals.
+Before publishing any raw journals or RPC response bytes, collect copies of the original bytes without editing originals; inventory and hash the originals; inspect for wallet secrets/tokens; sanitize **new copies**; independently hash the sanitized package and publish its separate digest manifest only after verifying it. Redacted copies necessarily have different hashes than originals. Do not upload or reveal unreviewed operator journals.
 
 ## Authoritative documents and date boundaries
 
