@@ -20,6 +20,7 @@ export function SpecClient({ specId }: { specId: number }) {
     walletAddress,
     writePhase,
     writeDetail,
+    pendingWrite,
     executeWrite,
     clearWriteState
   } = useProofSpec();
@@ -278,7 +279,7 @@ export function SpecClient({ specId }: { specId: number }) {
               {spec.state === "PENDING" ? (
                 <button
                   className="button button-primary full"
-                  disabled={!walletAddress}
+                  disabled={!walletAddress || Boolean(pendingWrite)}
                   onClick={() => {
                     clearWriteState();
                     setIntent({
@@ -326,7 +327,7 @@ export function SpecClient({ specId }: { specId: number }) {
                   </label>
                   <button
                     className="button button-primary"
-                    disabled={!walletAddress || !counterUrl.startsWith("https://")}
+                    disabled={!walletAddress || Boolean(pendingWrite) || !counterUrl.startsWith("https://")}
                     onClick={() => {
                       clearWriteState();
                       setIntent({
@@ -345,7 +346,7 @@ export function SpecClient({ specId }: { specId: number }) {
               {spec.pending_challenge_id ? (
                 <button
                   className="button button-primary full"
-                  disabled={!walletAddress}
+                  disabled={!walletAddress || Boolean(pendingWrite)}
                   onClick={() => {
                     clearWriteState();
                     setIntent({

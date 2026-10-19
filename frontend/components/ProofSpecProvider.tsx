@@ -12,6 +12,7 @@ import {
 } from "react";
 import { createProofSpecGateway, type ProofSpecGateway } from "@/lib/gateway";
 import { WriteLock } from "@/lib/write-safety";
+import { UncertainWriteError, refreshStatsAfterFinalizedWrite, type PendingWrite } from "@/lib/write-verification";
 import type { RuntimeConfig, WriteIntent, WritePhase, WriteResult } from "@/lib/types";
 
 type RuntimeContextValue = {
@@ -24,6 +25,8 @@ type RuntimeContextValue = {
   walletAddress: string | null;
   writePhase: WritePhase;
   writeDetail: string | null;
+  pendingWrite: PendingWrite | null;
+  resumePendingWrite(): Promise<void>;
   connectWallet(): Promise<void>;
   syncWalletNetwork(): Promise<void>;
   refreshStats(): Promise<void>;
@@ -43,6 +46,7 @@ export function ProofSpecProvider({ children }: { children: ReactNode }) {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [writePhase, setWritePhase] = useState<WritePhase>("idle");
   const [writeDetail, setWriteDetail] = useState<string | null>(null);
+  const [pendingWrite, setPendingWrite] = useState<PendingWrite | null>(null);
   const lock = useRef(new WriteLock());
 
   const refreshStatsFor = useCallback(async (activeGateway: ProofSpecGateway) => {
@@ -75,6 +79,7 @@ export function ProofSpecProvider({ children }: { children: ReactNode }) {
 
         const nextGateway = createProofSpecGateway(nextConfig);
         setGateway(nextGateway);
+        setPendingWrite(nextGateway.getPendingWrite());
         await refreshStatsFor(nextGateway);
       } catch (caught) {
         if (!cancelled) {
@@ -141,11 +146,15 @@ export function ProofSpecProvider({ children }: { children: ReactNode }) {
             setWritePhase(phase);
             setWriteDetail(detail || null);
           });
-          await refreshStatsFor(gateway);
+          setPendingWrite(gateway.getPendingWrite());
+          // Finality was already verified: a failed dashboard refresh must not
+          // relabel the successful write as FAILED or invite resubmission.
+          await refreshStatsAfterFinalizedWrite(() => refreshStatsFor(gateway), setError);
           return result;
         } catch (caught) {
           const message = caught instanceof Error ? caught.message : "Transaction failed.";
-          setWritePhase("failed");
+          setWritePhase(caught instanceof UncertainWriteError ? "uncertain" : "failed");
+          try { setPendingWrite(gateway.getPendingWrite()); } catch { /* retain last state */ }
           setWriteDetail(message);
           setError(message);
           throw caught;
@@ -155,12 +164,35 @@ export function ProofSpecProvider({ children }: { children: ReactNode }) {
     [gateway, refreshStatsFor, walletAddress]
   );
 
+  const resumePendingWrite = useCallback(async () => {
+    if (!gateway) throw new Error("ProofSpec is not configured.");
+    return lock.current.run(async () => {
+      setWritePhase("finalizing");
+      try {
+        await gateway.resumePendingWrite((phase, detail) => {
+          setWritePhase(phase);
+          setWriteDetail(detail || null);
+        });
+        setPendingWrite(gateway.getPendingWrite());
+        // The reconciled write remains finalized even if summary reads fail.
+        await refreshStatsAfterFinalizedWrite(() => refreshStatsFor(gateway), setError);
+      } catch (caught) {
+        const message = caught instanceof Error ? caught.message : "Unable to reconcile outstanding transaction.";
+        setWritePhase(caught instanceof UncertainWriteError ? "uncertain" : "failed");
+        setWriteDetail(message);
+        setError(message);
+        try { setPendingWrite(gateway.getPendingWrite()); } catch { /* keep prior state */ }
+        throw caught;
+      }
+    });
+  }, [gateway, refreshStatsFor]);
+
   const clearWriteState = useCallback(() => {
-    if (writePhase !== "submitting" && writePhase !== "finalizing") {
+    if (!pendingWrite && writePhase !== "submitting" && writePhase !== "finalizing" && writePhase !== "verifying") {
       setWritePhase("idle");
       setWriteDetail(null);
     }
-  }, [writePhase]);
+  }, [writePhase, pendingWrite]);
 
   const value = useMemo<RuntimeContextValue>(
     () => ({
@@ -173,6 +205,8 @@ export function ProofSpecProvider({ children }: { children: ReactNode }) {
       walletAddress,
       writePhase,
       writeDetail,
+      pendingWrite,
+      resumePendingWrite,
       connectWallet,
       syncWalletNetwork,
       refreshStats,
@@ -189,6 +223,8 @@ export function ProofSpecProvider({ children }: { children: ReactNode }) {
       walletAddress,
       writePhase,
       writeDetail,
+      pendingWrite,
+      resumePendingWrite,
       connectWallet,
       syncWalletNetwork,
       refreshStats,
@@ -197,7 +233,23 @@ export function ProofSpecProvider({ children }: { children: ReactNode }) {
     ]
   );
 
-  return <RuntimeContext.Provider value={value}>{children}</RuntimeContext.Provider>;
+  return (
+    <RuntimeContext.Provider value={value}>
+      {pendingWrite ? (
+        <section className="callout warning" role="status" aria-live="polite">
+          <strong>Outstanding ProofSpec transaction — do not resubmit</strong>
+          <p><code>{pendingWrite.hash || "No hash returned; manually inspect wallet history"}</code></p>
+          <p>Chain {pendingWrite.chainId}; contract {pendingWrite.contractAddress}</p>
+          <button className="button button-primary"
+            disabled={!pendingWrite.hash || ["finalizing", "verifying"].includes(writePhase)}
+            onClick={() => void resumePendingWrite().catch(() => undefined)}>
+            Resume finalized transaction verification
+          </button>
+        </section>
+      ) : null}
+      {children}
+    </RuntimeContext.Provider>
+  );
 }
 
 export function useProofSpec() {

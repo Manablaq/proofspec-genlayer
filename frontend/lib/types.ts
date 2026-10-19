@@ -122,6 +122,8 @@ export type WritePhase =
   | "submitting"
   | "submitted"
   | "finalizing"
+  | "verifying"
+  | "uncertain"
   | "finalized"
   | "failed";
 

@@ -22,7 +22,7 @@ def test_only_expected_imports_are_used():
                 imported.add(alias.name.split(".")[0])
         elif isinstance(node, ast.ImportFrom):
             imported.add((node.module or "").split(".")[0])
-    assert imported == {"hashlib", "json", "genlayer"}
+    assert imported == {"hashlib", "json", "time", "genlayer"}
 
 
 def test_forbidden_runtime_calls_are_absent():
@@ -49,8 +49,17 @@ def test_public_surface_matches_frozen_specification():
         "verify_evidence_snapshot",
         "create_spec",
         "evaluate_spec",
+        "reconsider_insufficient_spec",
+        "expire_challenge",
+        "get_decision_revision",
+        "get_release_provenance",
+        "authorize_github_release",
         "open_challenge",
         "resolve_challenge",
+        "reconsider_upheld_challenge",
+        "get_challenge_correction",
+        "get_publisher_attestation",
+        "attest_github_evidence_publisher",
     }
 
     tree = ast.parse(SOURCE)
@@ -160,9 +169,32 @@ def test_prompts_delimit_untrusted_evidence():
 
 
 def test_consensus_entrypoints_exist_but_direct_mode_certification_is_not_in_this_suite():
-    assert "def _evaluate_spec_consensus" in SOURCE
-    assert "def _challenge_consensus" in SOURCE
-    assert SOURCE.count("gl.vm.run_nondet(") == 2
+    expected = (
+        "_evaluate_spec_consensus",
+        "_challenge_consensus",
+        "_github_authority_consensus",
+        "_correction_consensus",
+        "_github_evidence_publisher_consensus",
+    )
+    tree = ast.parse(SOURCE)
+    functions = {
+        node.name: node for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+    }
+    for name in expected:
+        assert name in functions
+        calls = [
+            node for node in ast.walk(functions[name])
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "run_nondet"
+            and isinstance(node.func.value, ast.Attribute)
+            and node.func.value.attr == "vm"
+            and isinstance(node.func.value.value, ast.Name)
+            and node.func.value.value.id == "gl"
+        ]
+        assert len(calls) == 1, name
+    assert SOURCE.count("gl.vm.run_nondet(") == 5
     assert "genlayer_test" not in SOURCE
 
 
