@@ -4,6 +4,7 @@ import {
   type CalldataEncodable
 } from "genlayer-js/types";
 import { sdkChainFor } from "@/lib/network";
+import { validateWriteFeeQuote } from "@/lib/write-fees";
 import {
   PENDING_WRITE_KEY, UncertainWriteError, checkWalletIdentity,
   validatePendingWrite, verifyWriteTransition, classifyFinalizedExecution,
@@ -325,6 +326,21 @@ class GenLayerProofSpecGateway implements ProofSpecGateway {
     // These asynchronous reads may take time: revalidate immediately before signing.
     await this.assertActiveWallet(provider, this.account);
     if (this.getPendingWrite()) throw new Error("An earlier transaction is unresolved.");
+    // Simulate the exact write before requesting a wallet signature (read-only).
+    // Require an explicit, positive fee quote below the configured safety ceiling.
+    const args = productionArgs(intent);
+    const estimate = await this.readClient.estimateTransactionFeesForWrite({
+      // The SDK expects a Viem Account object; a plain address string is not one.
+      // A JSON-RPC account sets the simulated sender without exposing any key.
+      account: { address: this.account as `0x${string}`, type: "json-rpc" },
+      address: this.config.contractAddress,
+      functionName: intent.functionName,
+      args
+    });
+    const feeValue = validateWriteFeeQuote(estimate.feeValue, estimate.distribution);
+    await this.assertActiveWallet(provider, this.account);
+    if (this.getPendingWrite()) throw new Error("An earlier transaction is unresolved.");
+
     const pending: PendingWrite = {
       version: 1, hash: null, chainId: this.config.chainId,
       contractAddress: this.config.contractAddress, account: this.account,
@@ -332,7 +348,7 @@ class GenLayerProofSpecGateway implements ProofSpecGateway {
     };
     // Journal the intent before a potentially ambiguous wallet/broadcast response.
     this.storePending(pending);
-    onPhase("submitting");
+    onPhase("submitting", "Quoted fee deposit " + feeValue.toString() + " wei, capped at 0.001 GEN. Awaiting wallet approval.");
     const writeClient = createClient({
       chain: sdkChainFor(this.config.network), endpoint: this.config.rpcUrl,
       account: this.account as `0x${string}`,
@@ -343,7 +359,12 @@ class GenLayerProofSpecGateway implements ProofSpecGateway {
       rawHash = await writeClient.writeContract({
         address: this.config.contractAddress,
         functionName: intent.functionName,
-        args: productionArgs(intent)
+        args,
+        fees: {
+          distribution: estimate.distribution,
+          messageAllocations: estimate.messageAllocations ?? [],
+          feeValue
+        }
       });
     } catch (error) {
       const rejection = typeof error === "object" && error !== null && "code" in error
@@ -352,8 +373,12 @@ class GenLayerProofSpecGateway implements ProofSpecGateway {
         this.clearPending();
         throw error;
       }
+      // Keep the journal when the SDK did not return a transaction hash.
+      // Preserve the underlying RPC/wallet failure reason for investigation.
+      const reason = error instanceof Error ? error.message : String(error);
       throw new UncertainWriteError(
-        "Wallet/broadcast outcome is unknown. Inspect wallet transactions before signing again."
+        "Wallet/broadcast outcome is unknown. Inspect wallet transactions before signing again. " +
+        "Original wallet error: " + reason.slice(0, 350)
       );
     }
     const hash = String(rawHash);
