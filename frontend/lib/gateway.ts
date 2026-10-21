@@ -1,7 +1,6 @@
 import { createClient, isSuccessful } from "genlayer-js";
 import {
   TransactionHashVariant,
-  TransactionStatus,
   type CalldataEncodable
 } from "genlayer-js/types";
 import { sdkChainFor } from "@/lib/network";
@@ -263,7 +262,7 @@ class GenLayerProofSpecGateway implements ProofSpecGateway {
     let receipt: Awaited<ReturnType<typeof this.readClient.waitForTransactionReceipt>>;
     try {
       receipt = await this.readClient.waitForTransactionReceipt({
-        hash, status: TransactionStatus.FINALIZED, fullTransaction: false
+        hash, waitUntil: "finalized", fullTransaction: true
       });
     } catch {
       throw new UncertainWriteError(
