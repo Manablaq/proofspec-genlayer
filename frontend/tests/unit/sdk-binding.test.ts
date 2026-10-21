@@ -6,7 +6,8 @@ describe("GenLayer SDK binding guards", () => {
   it("forces finalized reads and finalized post-write waiting", async () => {
     const source = await readFile(resolve("lib/gateway.ts"), "utf8");
     expect(source).toContain("TransactionHashVariant.LATEST_FINAL");
-    expect(source).toContain("TransactionStatus.FINALIZED");
+    expect(source).toContain('hash, waitUntil: "finalized", fullTransaction: true');
+    expect(source).not.toContain("TransactionStatus.FINALIZED");
     expect(source).not.toContain("LATEST_NONFINAL");
   });
 

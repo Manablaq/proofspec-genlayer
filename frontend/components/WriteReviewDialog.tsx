@@ -26,7 +26,8 @@ export function WriteReviewDialog({
     phase === "requesting-wallet" ||
     phase === "submitting" ||
     phase === "submitted" ||
-    phase === "finalizing";
+    phase === "finalizing" ||
+    phase === "verifying";
 
   return (
     <div className="dialog-backdrop" role="presentation">
@@ -72,14 +73,15 @@ export function WriteReviewDialog({
           <span className={`finality-step ${["submitting", "submitted", "finalizing", "finalized"].includes(phase) ? "active" : ""}`}>
             2 · Submitted
           </span>
-          <span className={`finality-step ${["finalizing", "finalized"].includes(phase) ? "active" : ""}`}>
+          <span className={`finality-step ${["finalizing", "verifying", "finalized"].includes(phase) ? "active" : ""}`}>
             3 · Finality
           </span>
           <span className={`finality-step ${phase === "finalized" ? "active" : ""}`}>4 · Finalized</span>
         </div>
 
         {detail ? <p className="callout compact">{detail}</p> : null}
-        {phase === "failed" ? <p className="error-banner">Transaction did not finalize successfully.</p> : null}
+        {phase === "failed" ? <p className="error-banner">Transaction failed verification; inspect the transaction ID and error.</p> : null}
+        {phase === "uncertain" ? <p className="error-banner">Outcome uncertain: do not sign again. Resume transaction verification instead.</p> : null}
 
         <div className="dialog-actions">
           <button className="button button-quiet" onClick={onClose} disabled={busy}>
@@ -88,7 +90,7 @@ export function WriteReviewDialog({
           <button
             className="button button-primary"
             onClick={onConfirm}
-            disabled={busy || phase === "finalized"}
+            disabled={busy || phase === "finalized" || phase === "uncertain"}
             data-testid="confirm-write"
           >
             {busy ? "Write in progress…" : "Confirm & sign"}

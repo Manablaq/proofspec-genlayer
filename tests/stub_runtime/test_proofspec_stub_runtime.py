@@ -110,7 +110,11 @@ def make_contract():
     contract.challenges = StubTreeMap()
     contract.spec_fingerprints = StubTreeMap()
     contract.challenge_host_fingerprints = StubTreeMap()
+    contract.challenge_url_attempts = StubTreeMap()
     contract.evidence_snapshots = StubTreeMap()
+    contract.decision_history = StubTreeMap()
+    contract.challenge_corrections = StubTreeMap()
+    contract.publisher_attestations = StubTreeMap()
     return module, env, contract
 
 
@@ -633,7 +637,7 @@ def test_challenge_limit_is_enforced_before_creation():
     module, _env, contract = make_contract()
     spec_id = seed_directional_evaluated_spec(contract, module)
     spec = contract.get_spec(spec_id)
-    spec["challenge_count"] = module.MAX_CHALLENGES_PER_SPEC
+    spec["qualified_challenge_count"] = module.MAX_CHALLENGES_PER_SPEC
     contract.specs[spec_id] = module._compact_json(spec)
 
     with pytest.raises(StubUserError, match="challenge limit reached"):
@@ -827,3 +831,244 @@ def test_utf8_commitment_uses_bytes_while_content_bound_uses_characters():
     assert snapshot["content_length"] == len(content)
     assert snapshot["content_sha256"] == digest
     assert snapshot["source_status"] == module.SOURCE_AVAILABLE
+
+
+def test_r2_timeout_is_bounded_and_preserves_original_certificate(monkeypatch):
+    module, env, contract = make_contract()
+    clock = [100000]
+    monkeypatch.setattr(module, "_challenge_now", lambda: clock[0])
+    spec_id = seed_directional_evaluated_spec(contract, module)
+    challenge_id = contract.open_challenge(
+        spec_id, 1, "https://counter.example/first", "first challenge"
+    )
+    pending = contract.get_challenge(challenge_id)
+    assert pending["opened_at"] == 100000
+    assert pending["expires_at"] == 186400
+    assert pending["counts_toward_challenge_limit"] is False
+    assert contract.get_spec(spec_id)["pending_challenge_id"] == challenge_id
+    with pytest.raises(StubUserError, match="not expired"):
+        contract.expire_challenge(challenge_id)
+    clock[0] = 186400
+    with pytest.raises(StubUserError, match="expired; call expire_challenge"):
+        contract.resolve_challenge(challenge_id)
+    expired = contract.expire_challenge(challenge_id)
+    assert expired["state"] == "EXPIRED"
+    assert expired["challenge_outcome"] == "INSUFFICIENT"
+    assert expired["counts_toward_challenge_limit"] is False
+    spec = contract.get_spec(spec_id)
+    assert spec["pending_challenge_id"] == 0
+    assert spec["effective_certificate_result"] == "CERTIFIED"
+    assert spec["qualified_challenge_count"] == 0
+    assert spec["revision"] == 1
+    assert env.nondet_calls == 0
+    with pytest.raises(StubUserError, match="not pending"):
+        contract.expire_challenge(challenge_id)
+
+
+def test_r2_duplicate_and_unavailable_attempt_budgets(monkeypatch):
+    module, env, contract = make_contract()
+    clock = [25000]
+    monkeypatch.setattr(module, "_challenge_now", lambda: clock[0])
+    spec_id = seed_directional_evaluated_spec(contract, module)
+    ids = []
+    for n in range(2):
+        cid = contract.open_challenge(
+            spec_id, 1, "https://recoverable.example/counter", "retry source"
+        )
+        ids.append(cid)
+        with pytest.raises(StubUserError, match="already has a pending challenge"):
+            contract.open_challenge(
+                spec_id, 1, "https://different.example/counter", "blocked"
+            )
+        clock[0] += 86400
+        contract.expire_challenge(cid)
+    assert ids == [1, 2]
+    with pytest.raises(StubUserError, match="Counter URL retry limit reached"):
+        contract.open_challenge(
+            spec_id, 1, "https://recoverable.example/counter", "attempt 3"
+        )
+    cid = contract.open_challenge(
+        spec_id, 1, "https://recoverable.example/different-immutable-version", "new evidence"
+    )
+    assert int(cid) == 3
+    assert contract.get_spec(spec_id)["qualified_challenge_count"] == 0
+    assert env.nondet_calls == 0
+
+
+def test_r2_only_qualified_uses_global_capacity():
+    module, env, contract = make_contract()
+    spec_id = seed_directional_evaluated_spec(contract, module)
+    spec = contract.get_spec(spec_id)
+    spec["challenge_count"] = 100  # Failed/expired historic attempts don't consume slots.
+    spec["qualified_challenge_count"] = 0
+    contract.specs[spec_id] = module._compact_json(spec)
+    cid = contract.open_challenge(
+        spec_id, 1, "https://fresh.example/release", "legitimate"
+    )
+    assert cid == 1
+    assert contract.get_spec(spec_id)["challenge_count"] == 101
+    assert contract.get_spec(spec_id)["qualified_challenge_count"] == 0
+    assert env.nondet_calls == 0
+
+
+def _r6_seed_upheld():
+    module, env, contract = make_contract()
+    spec_id = seed_directional_evaluated_spec(contract, module)
+    challenge_id = contract.open_challenge(
+        spec_id, 1, 'https://counter.example/release', 'counter alleges violation'
+    )
+    challenge = contract.get_challenge(challenge_id)
+    counter_content = 'Original immutable counter source claims contradiction.'
+    counter_sha = hashlib.sha256(counter_content.encode('utf-8')).hexdigest()
+    counter_evidence = {
+        'spec_id': int(spec_id), 'criterion_id': 1,
+        'source_role': module.COUNTER,
+        'status': module.EVIDENCE_AVAILABLE,
+        'source_status': module.SOURCE_AVAILABLE,
+        'url': challenge['counter_url'], 'host': challenge['counter_host'],
+        'snapshot_id': module._snapshot_id(int(spec_id), 1, module.COUNTER,
+                                          challenge['counter_url'], counter_sha),
+        'content_sha256': counter_sha,
+        'content_length': len(counter_content), 'content': counter_content,
+    }
+    counter_snapshot = module._snapshot_record(counter_evidence)
+    contract.evidence_snapshots[counter_snapshot['snapshot_id']] = module._compact_json(counter_snapshot)
+    challenge['state'] = module.CHALLENGE_RESOLVED
+    challenge['challenge_outcome'] = module.CHALLENGE_UPHELD
+    challenge['counter_assessment'] = module.CONTRADICTS
+    challenge['counter_release_status'] = module.VERSION_MATCHES_RELEASE
+    challenge['counter_snapshot_id'] = counter_snapshot['snapshot_id']
+    challenge['upheld_revision'] = 2
+    contract.challenges[challenge_id] = module._compact_json(challenge)
+    spec = contract.get_spec(spec_id)
+    spec['criteria'][0]['effective_result'] = module.INSUFFICIENT
+    spec['effective_certificate_result'] = module.INSUFFICIENT
+    spec['pending_challenge_id'] = 0
+    spec['revision'] = 2
+    contract.specs[spec_id] = module._compact_json(spec)
+    contract._record_decision_revision(spec, 'UPHELD_CHALLENGE', 1)
+    return module, env, contract, spec_id, challenge_id
+
+
+def _r6_mock_correction(module, contract, spec_id, restore=True):
+    url = 'https://independent-rebuttal.example/release'
+    content = 'Exact release body with distinct-host rebuttal.'
+    digest = hashlib.sha256(content.encode('utf-8')).hexdigest()
+    evidence = {
+        'spec_id': int(spec_id), 'criterion_id': 1,
+        'source_role': module.CORRECTION,
+        'status': module.EVIDENCE_AVAILABLE, 'source_status': module.SOURCE_AVAILABLE,
+        'url': url, 'host': 'independent-rebuttal.example',
+        'snapshot_id': module._snapshot_id(int(spec_id), 1, module.CORRECTION, url, digest),
+        'content_sha256': digest, 'content_length': len(content), 'content': content,
+    }
+    result = {
+        'outcome': 'RESTORED' if restore else 'NOT_RESTORED',
+        'rebuttal_evidence': evidence,
+        'rebuttal_assessment': module.SUPPORTS,
+        'rebuttal_release_status': module.VERSION_MATCHES_RELEASE,
+        'counter_reassessment': module.IRRELEVANT if restore else module.CONTRADICTS,
+        'counter_release_reassessment': module.VERSION_MATCHES_RELEASE,
+        'publisher_authority_status': ('GITHUB_PROTECTED_MAIN_PINNED_EVIDENCE_MANIFEST_VERIFIED' if restore else 'UNVERIFIED'),
+        # Synthetic proof ONLY: the state-transition stub mocks consensus.
+        # The standalone R8 publisher-proof tests exercise real validation.
+        'publisher_proof': ({
+            'publisher_authority_status': 'GITHUB_PROTECTED_MAIN_PINNED_EVIDENCE_MANIFEST_VERIFIED',
+            'independent_authority_verified': False,
+            'role': module.CORRECTION,
+            'evidence_url': url,
+            'evidence_sha256': digest,
+            'release_ref': contract.get_spec(spec_id)['release_ref'],
+            'criterion_sha256': module._sha256_text(contract.get_spec(spec_id)['criteria'][0]['requirement']),
+        } if restore else None),
+        'rationale': 'Original counter snapshot irrelevant to this exact requirement.',
+    }
+    module._correction_consensus = lambda *_args: result
+    return url
+
+
+def test_r6_stub_valid_correction_restores_but_preserves_counter_and_history():
+    module, env, contract, sid, cid = _r6_seed_upheld()
+    counter = contract.get_challenge(cid)['counter_snapshot_id']
+    url = _r6_mock_correction(module, contract, sid)
+    record = contract.reconsider_upheld_challenge(cid, url, 'Please correct a misclassified counter')
+    assert record['outcome'] == 'RESTORED'
+    assert record['publisher_authority_status'] == 'GITHUB_PROTECTED_MAIN_PINNED_EVIDENCE_MANIFEST_VERIFIED'
+    assert contract.get_spec(sid)['revision'] == 3
+    assert contract.get_spec(sid)['initial_certificate_result'] == module.CERTIFIED
+    assert contract.get_spec(sid)['effective_certificate_result'] == module.CERTIFIED
+    assert contract.get_decision_revision(sid, 2)['effective_certificate_result'] == module.INSUFFICIENT
+    assert contract.get_decision_revision(sid, 3)['effective_certificate_result'] == module.CERTIFIED
+    assert contract.get_challenge_correction(cid)['challenge_counter_snapshot_id'] == counter
+    assert contract.get_challenge(cid)['counter_snapshot_id'] == counter
+    assert contract.verify_evidence_snapshot(counter) is True
+    assert contract.verify_evidence_snapshot(record['rebuttal_snapshot_id']) is True
+    assert env.nondet_calls == 0
+    with pytest.raises(StubUserError, match='correction already attempted'):
+        contract.reconsider_upheld_challenge(cid, url, 'cannot retry')
+
+
+def test_r6_stub_counter_still_relevant_cannot_restore():
+    module, env, contract, sid, cid = _r6_seed_upheld()
+    url = _r6_mock_correction(module, contract, sid, restore=False)
+    record = contract.reconsider_upheld_challenge(cid, url, 'counter remains relevant')
+    assert record['outcome'] == 'NOT_RESTORED'
+    assert contract.get_spec(sid)['effective_certificate_result'] == module.INSUFFICIENT
+    assert contract.get_spec(sid)['revision'] == 2
+    assert contract.get_challenge_correction(cid)['outcome'] == 'NOT_RESTORED'
+    with pytest.raises(StubUserError, match='correction already attempted'):
+        contract.reconsider_upheld_challenge(cid, url, 'cannot retry either')
+
+
+def test_r6_stub_not_upheld_and_stale_revision_are_rejected():
+    module, env, contract = make_contract()
+    sid = seed_directional_evaluated_spec(contract, module)
+    cid = contract.open_challenge(sid, 1, 'https://counter.example/release', 'pending')
+    with pytest.raises(StubUserError, match='Only upheld challenges'):
+        contract.reconsider_upheld_challenge(cid, 'https://outside.example/release', 'not yet upheld')
+    module, env, contract, sid, cid = _r6_seed_upheld()
+    url = _r6_mock_correction(module, contract, sid)
+    spec = contract.get_spec(sid)
+    spec['revision'] = 3
+    contract.specs[sid] = module._compact_json(spec)
+    with pytest.raises(StubUserError, match='Stale upheld challenge revision'):
+        contract.reconsider_upheld_challenge(cid, url, 'stale')
+
+
+def test_r6_stub_unauthorized_and_reused_source_rejected():
+    module, env, contract, sid, cid = _r6_seed_upheld()
+    url = _r6_mock_correction(module, contract, sid)
+    module.gl.message.sender_address = '0x2222222222222222222222222222222222222222'
+    with pytest.raises(StubUserError, match='Only specification submitter'):
+        contract.reconsider_upheld_challenge(cid, url, 'not authorized')
+    module.gl.message.sender_address = '0x1111111111111111111111111111111111111111'
+    with pytest.raises(StubUserError, match='distinct source host'):
+        contract.reconsider_upheld_challenge(cid, 'https://counter.example/different', 'same host')
+    with pytest.raises(StubUserError, match='distinct source host'):
+        contract.reconsider_upheld_challenge(cid, 'https://evidence.example/different', 'primary host')
+
+
+def test_r6_stub_tampered_original_counter_cannot_be_corrected():
+    module, env, contract, sid, cid = _r6_seed_upheld()
+    url = _r6_mock_correction(module, contract, sid)
+    counter_id = contract.get_challenge(cid)['counter_snapshot_id']
+    corrupted = contract.get_evidence_snapshot(counter_id)
+    corrupted['content'] = 'forged counter bytes'
+    contract.evidence_snapshots[counter_id] = module._compact_json(corrupted)
+    with pytest.raises(StubUserError, match='Required evidence snapshot is invalid'):
+        contract.reconsider_upheld_challenge(cid, url, 'tampered')
+    assert not contract.challenge_corrections
+
+
+def test_r6_stub_model_cannot_forcibly_restore_a_valid_counter():
+    module, env, contract, sid, cid = _r6_seed_upheld()
+    url = _r6_mock_correction(module, contract, sid, restore=False)
+    old = module._correction_consensus
+    def forged(*args):
+        result = old(*args)
+        return {**result, 'outcome': 'RESTORED'}
+    module._correction_consensus = forged
+    with pytest.raises(StubUserError, match='Invalid correction consensus result'):
+        contract.reconsider_upheld_challenge(cid, url, 'forged success')
+    assert contract.get_spec(sid)['effective_certificate_result'] == module.INSUFFICIENT
+    assert not contract.challenge_corrections

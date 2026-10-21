@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -12,11 +13,11 @@ RELEASE_REF = "commit-0123456789abcdef"
 
 PRIMARY = "https://primary.example/release"
 CORROBORATING = "https://corroborating.example/release"
-COUNTER = "https://counter.example/release"
+COUNTER = "https://raw.githubusercontent.com/SourceOrg/independent-evidence/0123456789abcdef0123456789abcdef01234567/findings/evidence.txt"
 
 PRIMARY_PATTERN = r"primary\.example/release"
 CORROBORATING_PATTERN = r"corroborating\.example/release"
-COUNTER_PATTERN = r"counter\.example/release"
+COUNTER_PATTERN = r"raw\.githubusercontent\.com/SourceOrg/independent-evidence/0123456789abcdef0123456789abcdef01234567/findings/evidence\.txt"
 
 SNAPSHOT_VERSION = "proofspec-evidence-snapshot-v1"
 
@@ -95,12 +96,14 @@ def challenge_payload(
     *,
     counter_assessment,
     counter_version_status="NOT_APPLICABLE",
+    counter_release_status="MATCHES_RELEASE",
     rationale="bounded challenge rationale",
     **extra,
 ):
     return llm_json(
         counter_assessment=counter_assessment,
         counter_version_status=counter_version_status,
+        counter_release_status=counter_release_status,
         rationale=rationale,
         **extra,
     )
@@ -113,11 +116,55 @@ def mock_primary(direct_vm, body):
     )
 
 
-def mock_counter(direct_vm, body):
-    direct_vm.mock_web(
-        COUNTER_PATTERN,
-        {"status": 200, "body": body},
+R8_PUBLISHER_REPO = "SourceOrg/independent-evidence"
+R8_PUBLISHER_COMMIT = "0123456789abcdef0123456789abcdef01234567"
+R8_PUBLISHER_HEAD = "f" * 40
+R8_PUBLISHER_WALLET = "0x" + "2" * 40
+
+
+def mock_pinned_publisher(direct_vm, body, *, role="COUNTER",
+                          repo=R8_PUBLISHER_REPO,
+                          commit=R8_PUBLISHER_COMMIT,
+                          evidence_path="findings/evidence.txt",
+                          protected=True, manifest_change=None,
+                          requirement="Wallet disconnect is implemented."):
+    """Deterministic mocked GitHub authority: NOT a real external proof.
+
+    The manifest is matched to exact evidence bytes, release and criterion,
+    exercising both leader and independently executed validator source reads.
+    """
+    branch = {"name":"main", "protected":protected,
+              "commit":{"sha":R8_PUBLISHER_HEAD}}
+    compare = {"status":"ahead",
+               "base_commit":{"sha":commit},
+               "merge_base_commit":{"sha":commit}}
+    manifest = {
+        "schema":"proofspec-github-evidence-publisher-v1",
+        "repository":repo,
+        "commit_oid":commit,
+        "evidence_path":evidence_path,
+        "evidence_sha256":hashlib.sha256(body.strip().encode()).hexdigest(),
+        "release_ref":RELEASE_REF,
+        "criterion_sha256":hashlib.sha256(requirement.encode()).hexdigest(),
+        "publisher_wallet":R8_PUBLISHER_WALLET,
+        "role":role,
+    }
+    if manifest_change:
+        manifest.update(manifest_change)
+    root_regex = re.escape("https://api.github.com/repos/" + repo)
+    raw_prefix = "https://raw.githubusercontent.com/" + repo + "/" + commit
+    paths = (
+        (root_regex + r"/branches/main$", json.dumps(branch)),
+        (root_regex + "/compare/" + commit + r"\.\.\." + R8_PUBLISHER_HEAD + r"$", json.dumps(compare)),
+        (re.escape(raw_prefix + "/.proofspec/evidence-authority.json") + r"$", json.dumps(manifest)),
+        (re.escape(raw_prefix + "/" + evidence_path) + r"$", body),
     )
+    for pattern, value in paths:
+        direct_vm.mock_web(pattern, {"status": 200, "body": value})
+
+
+def mock_counter(direct_vm, body):
+    mock_pinned_publisher(direct_vm, body)
 
 
 def create_single_spec(
