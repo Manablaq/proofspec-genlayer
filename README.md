@@ -4,6 +4,19 @@
 
 ProofSpec is a GenLayer-native application for proving whether a software release satisfies a bounded, human-readable specification using versioned public evidence, validator consensus, immutable evidence snapshots, and challengeable certificates.
 
+## Current Studio Devnet release candidate (2026-10-21)
+
+**Status:** Release candidate verified in Vercel Preview; production source promotion and submission remain pending. This section supersedes the old deploy/configuration instructions below, but the October 16 checkpoint remains valid historical evidence about a *different* contract.
+
+- Current frozen Intelligent Contract: `contracts/proofspec.py` SHA-256 `c37479737913eb65e9585a403ae308c2a8395433895fa80d3c14a6b835fd4816`.
+- Current Studio Devnet (chain `61997`) contract: `0x2240176b5fBa877cfD015877b68981D4c47a3659`; RPC `https://studio-dev.genlayer.com/api`.
+- Deployment transaction `0x4a3ef9d5a41693c6346d08a94c68231837e8a1c972c5725ead4f49e480cab228` was reconciled as FINALIZED / FINISHED_WITH_RETURN. R60 read-only compatibility checks passed; counts at that checkpoint were zero specifications and zero challenges.
+- Frontend: R69 local certification passed (20/20 unit tests, 12/12 mock-RPC/browser E2E, typecheck, lint, build and zero reported high-or-higher production dependency vulnerabilities). R71 Vercel Preview runtime binding passed at commit `b471bf493b6d6a551f51ebfb951b0d812e834cfa`. R72 verified three separate encrypted, Production-only variables with correct values.
+- **Not yet completed:** merge to GitHub `main`, a new Production deployment, Production runtime and finalized guest-read certification, a live R53 write lifecycle, Bradbury persistent certification, and the 12-write reviewer matrix. The owner elected Studio Devnet-only submission; reviewer acceptance is not guaranteed.
+- The historical October 16 contract `0xD11A506B363E131e8fA3eBeC28a21cC8a4375110` used older contract source and had a *separate* certified evaluation. That certificate **must not** be attributed to the current R53 contract.
+
+See `docs/STUDIO_NEXT_ONLY_SUBMISSION_SCOPE.md` for the current release boundaries. Do not interpret the historical release-path and safety sections below as current promotion status.
+
 ## Progress — Studio Next live checkpoint (2026-10-16)
 
 `PROOFSPEC_STUDIO_NEXT_LIVE=FINALIZED_CERTIFIED`; `PROOFSPEC_BRADBURY_CERTIFICATION=NOT_PERFORMED`.
