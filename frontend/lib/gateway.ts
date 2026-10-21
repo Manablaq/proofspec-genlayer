@@ -5,6 +5,7 @@ import {
 } from "genlayer-js/types";
 import { sdkChainFor } from "@/lib/network";
 import { validateWriteFeeQuote } from "@/lib/write-fees";
+import { captureSubmittedHash } from "@/lib/write-hash-capture";
 import {
   PENDING_WRITE_KEY, UncertainWriteError, checkWalletIdentity,
   validatePendingWrite, verifyWriteTransition, classifyFinalizedExecution,
@@ -349,10 +350,18 @@ class GenLayerProofSpecGateway implements ProofSpecGateway {
     // Journal the intent before a potentially ambiguous wallet/broadcast response.
     this.storePending(pending);
     onPhase("submitting", "Quoted fee deposit " + feeValue.toString() + " wei, capped at 0.001 GEN. Awaiting wallet approval.");
+    // Record the wallet's hash immediately, before the SDK awaits its EVM receipt.
+    // The SDK's post-broadcast receipt wait can fail after the write has succeeded.
+    let walletHash: string | null = null;
+    const monitoredProvider = captureSubmittedHash(provider, (hash) => {
+      walletHash = hash;
+      this.storePending({ ...pending, hash });
+      onPhase("submitted", hash);
+    });
     const writeClient = createClient({
       chain: sdkChainFor(this.config.network), endpoint: this.config.rpcUrl,
       account: this.account as `0x${string}`,
-      provider: provider as NonNullable<Parameters<typeof createClient>[0]>["provider"]
+      provider: monitoredProvider as NonNullable<Parameters<typeof createClient>[0]>["provider"]
     });
     let rawHash: unknown;
     try {
@@ -367,6 +376,21 @@ class GenLayerProofSpecGateway implements ProofSpecGateway {
         }
       });
     } catch (error) {
+      const recovered = walletHash as string | null;
+      if (recovered) {
+        // Never sign again. A hash already returned by Rabby means the SDK
+        // failure happened *after* submission; finish via read-only finality.
+        let persisted: PendingWrite | null = null;
+        try { persisted = this.getPendingWrite(); } catch { /* manual reconciliation */ }
+        if (!persisted || persisted.hash?.toLowerCase() !== recovered.toLowerCase()) {
+          throw new UncertainWriteError(
+            "Wallet submitted transaction " + recovered +
+            " but its journal is not durably verified. Do not sign again.", recovered
+          );
+        }
+        onPhase("finalizing", recovered);
+        return this.reconcile({ ...pending, hash: recovered }, onPhase);
+      }
       const rejection = typeof error === "object" && error !== null && "code" in error
         && Number((error as {code: unknown}).code) === 4001;
       if (rejection) {
@@ -385,12 +409,22 @@ class GenLayerProofSpecGateway implements ProofSpecGateway {
     if (!/^0x[0-9a-f]{64}$/i.test(hash)) {
       throw new UncertainWriteError("The wallet returned an invalid transaction ID: " + hash);
     }
-    // Do not erase the provisional journal if persistence fails after broadcast.
-    try { this.storePending({...pending,hash}); }
-    catch { throw new UncertainWriteError("Submitted transaction " + hash +
-      " but could not persist its ID. Preserve this ID and reconcile manually.", hash); }
-    onPhase("submitted", hash);
-    return this.reconcile({...pending,hash}, onPhase);
+    // The immediate wallet hash must agree with the SDK's returned hash.
+    const recordedHash = walletHash as string | null;
+    if (recordedHash && recordedHash.toLowerCase() !== hash.toLowerCase()) {
+      throw new UncertainWriteError(
+        "Wallet and SDK transaction hashes disagree. Preserve " + recordedHash +
+        "; do not sign again.", recordedHash
+      );
+    }
+    // Fall back to the SDK hash only when no wallet-provider hash was observed.
+    if (!recordedHash) {
+      try { this.storePending({ ...pending, hash }); }
+      catch { throw new UncertainWriteError("Submitted transaction " + hash +
+        " but could not persist its ID. Preserve this ID and reconcile manually.", hash); }
+      onPhase("submitted", hash);
+    }
+    return this.reconcile({ ...pending, hash }, onPhase);
   }
 
 }
