@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { applyMockWrite, mockState, resetMockState } from "@/lib/mock-state";
+import { applyMockWrite, mockState, resetMockState, seedMockScenario } from "@/lib/mock-state";
 import type { WriteIntent } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +37,20 @@ export async function POST(request: Request) {
         const state = resetMockState();
         return ok(id, { specCount: state.specCount, challengeCount: state.challengeCount });
       }
+      case "proofspec_seedScenario": {
+        const scenario = params[0];
+        const submitter = params[1];
+        if (typeof scenario !== "string" || typeof submitter !== "string" ||
+            !/^0x[0-9a-f]{40}$/i.test(submitter) ||
+            !["insufficient-reconsideration", "expired-challenge", "upheld-correction", "release-authorization"].includes(scenario)) {
+          return fail(id, "Invalid mock scenario.", -32602);
+        }
+        const state = seedMockScenario(
+          scenario as "insufficient-reconsideration" | "expired-challenge" | "upheld-correction" | "release-authorization",
+          submitter
+        );
+        return ok(id, { specCount: state.specCount, challengeCount: state.challengeCount });
+      }
       case "proofspec_getSpecCount":
         return ok(id, mockState().specCount);
       case "proofspec_getChallengeCount":
@@ -50,6 +64,13 @@ export async function POST(request: Request) {
         const challenge = mockState().challenges[Number(params[0])];
         if (!challenge) return fail(id, "Challenge does not exist.");
         return ok(id, challenge);
+      }
+      case "proofspec_getChallengeCorrection":
+        return ok(id, mockState().corrections[Number(params[0])] ?? null);
+      case "proofspec_getReleaseProvenance": {
+        const spec = mockState().specs[Number(params[0])];
+        if (!spec) return fail(id, "Specification does not exist.");
+        return ok(id, spec.release_provenance);
       }
       case "proofspec_getEvidenceSnapshot": {
         const snapshot = mockState().snapshots[String(params[0])];

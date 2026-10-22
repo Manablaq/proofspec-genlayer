@@ -1,6 +1,8 @@
 # ProofSpec Release Gates
 
-Status: **Progress 1/7 specification freeze**
+Status: **Progress 5/7 Studio Devnet compatibility evidence captured; Progress 6/7 Bradbury certification not performed; Progress 7/7 release/submission certification incomplete.**
+
+The current R53 Studio Devnet deployment and its finalized create/evaluate lifecycle are recorded in `docs/STUDIO_NEXT_OPERATOR_RUNBOOK.md`. This is bounded, resettable-network compatibility evidence. The frozen Bradbury matrix remains excluded by the owner-scoped submission decision and has not passed. Production promotion, live guest-read reconciliation, clean-commit release binding, and final submission evidence remain open.
 
 ProofSpec uses seven sequential gates. A later gate cannot be marked complete because an earlier one is "probably fine."
 

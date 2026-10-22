@@ -12,13 +12,13 @@ from test_proofspec_direct import (
 )
 
 
-def _setup(direct_vm, direct_deploy, *, counter_body="Counter release evidence"):
+def _setup(direct_vm, direct_deploy, *, counter_body="Counter release evidence", publisher=False):
     contract, sid, before = evaluate_directional_spec(
         direct_vm, direct_deploy, direction="SUPPORTS"
     )
     cid = open_challenge(contract, sid)
     mock_primary(direct_vm, "ORIGINAL_PRIMARY_EVIDENCE")
-    mock_counter(direct_vm, counter_body)
+    mock_counter(direct_vm, counter_body, publisher=publisher)
     return contract, sid, cid, before
 
 
@@ -64,7 +64,7 @@ def test_r5_different_release_counter_cannot_downgrade_certified(
 def test_r8_same_release_counter_upholds_only_with_verified_publisher(
     direct_vm, direct_deploy
 ):
-    contract, sid, cid, before = _setup(direct_vm, direct_deploy)
+    contract, sid, cid, before = _setup(direct_vm, direct_deploy, publisher=True)
     direct_vm.mock_llm(
         r"PROOFSPEC_CHALLENGE_V1",
         challenge_payload(counter_assessment="CONTRADICTS",
@@ -86,7 +86,7 @@ def test_r8_same_release_counter_upholds_only_with_verified_publisher(
 
 
 def test_r5_validator_disagrees_on_exact_release_status(direct_vm, direct_deploy):
-    contract, sid, cid, _before = _setup(direct_vm, direct_deploy)
+    contract, sid, cid, _before = _setup(direct_vm, direct_deploy, publisher=True)
     direct_vm.mock_llm(
         r"PROOFSPEC_CHALLENGE_V1",
         challenge_payload(counter_assessment="CONTRADICTS",

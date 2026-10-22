@@ -12,6 +12,7 @@ import {
   type ObservedWriteState, type PendingWrite
 } from "@/lib/write-verification";
 import type {
+  ChallengeCorrection,
   ChallengeRecord,
   EvidenceSnapshot,
   RuntimeConfig,
@@ -30,6 +31,8 @@ export interface ProofSpecGateway {
   getChallengeCount(): Promise<number>;
   getSpec(specId: number): Promise<SpecRecord>;
   getChallenge(challengeId: number): Promise<ChallengeRecord>;
+  getChallengeCorrection(challengeId: number): Promise<ChallengeCorrection | null>;
+  getReleaseProvenance(specId: number): Promise<SpecRecord["release_provenance"]>;
   getEvidenceSnapshot(snapshotId: string): Promise<EvidenceSnapshot>;
   verifyEvidenceSnapshot(snapshotId: string): Promise<boolean>;
   connectWallet(): Promise<string>;
@@ -75,6 +78,12 @@ function productionArgs(intent: WriteIntent): CalldataEncodable[] {
       ];
     case "resolve_challenge":
       return [BigInt(intent.args[0])];
+    case "authorize_github_release":
+    case "reconsider_insufficient_spec":
+    case "expire_challenge":
+      return [BigInt(intent.args[0])];
+    case "reconsider_upheld_challenge":
+      return [BigInt(intent.args[0]), intent.args[1], intent.args[2]];
   }
 }
 
@@ -161,6 +170,17 @@ class GenLayerProofSpecGateway implements ProofSpecGateway {
     return (await this.read("get_challenge", [BigInt(challengeId)])) as unknown as ChallengeRecord;
   }
 
+  async getChallengeCorrection(challengeId: number): Promise<ChallengeCorrection | null> {
+    const result = await this.read("get_challenge_correction", [BigInt(challengeId)]);
+    return result && typeof result === "object" && "challenge_id" in result
+      ? result as unknown as ChallengeCorrection
+      : null;
+  }
+
+  async getReleaseProvenance(specId: number): Promise<SpecRecord["release_provenance"]> {
+    return await this.read("get_release_provenance", [BigInt(specId)]) as SpecRecord["release_provenance"];
+  }
+
   async getEvidenceSnapshot(snapshotId: string): Promise<EvidenceSnapshot> {
     return (await this.read("get_evidence_snapshot", [snapshotId])) as unknown as EvidenceSnapshot;
   }
@@ -241,6 +261,21 @@ class GenLayerProofSpecGateway implements ProofSpecGateway {
       case "resolve_challenge": {
         const challenge = await this.getChallenge(intent.args[0]);
         return { challenge, spec: await this.getSpec(challenge.spec_id) };
+      }
+      case "authorize_github_release":
+      case "reconsider_insufficient_spec":
+        return { spec: await this.getSpec(intent.args[0]) };
+      case "expire_challenge": {
+        const challenge = await this.getChallenge(intent.args[0]);
+        return { challenge, spec: await this.getSpec(challenge.spec_id) };
+      }
+      case "reconsider_upheld_challenge": {
+        const challenge = await this.getChallenge(intent.args[0]);
+        return {
+          challenge,
+          spec: await this.getSpec(challenge.spec_id),
+          correction: await this.getChallengeCorrection(intent.args[0])
+        };
       }
     }
   }
@@ -479,6 +514,14 @@ class MockRpcProofSpecGateway implements ProofSpecGateway {
 
   async getChallenge(challengeId: number): Promise<ChallengeRecord> {
     return this.rpc<ChallengeRecord>("proofspec_getChallenge", [challengeId]);
+  }
+
+  async getChallengeCorrection(challengeId: number): Promise<ChallengeCorrection | null> {
+    return this.rpc<ChallengeCorrection | null>("proofspec_getChallengeCorrection", [challengeId]);
+  }
+
+  async getReleaseProvenance(specId: number): Promise<SpecRecord["release_provenance"]> {
+    return this.rpc<SpecRecord["release_provenance"]>("proofspec_getReleaseProvenance", [specId]);
   }
 
   async getEvidenceSnapshot(snapshotId: string): Promise<EvidenceSnapshot> {
