@@ -41,9 +41,8 @@ def fixtures(direct_vm, spec, *, protected=True, manifest_change=None, content=B
     branch = {'name': 'main', 'protected': protected, 'commit': {'sha': HEAD}}
     compare = {'status':'ahead', 'base_commit':{'sha':OID}, 'merge_base_commit':{'sha':OID}}
     manifest = {
-        'schema': 'proofspec-github-evidence-publisher-v1',
+        'schema': 'proofspec-github-evidence-publisher-v2',
         'repository': REPO,
-        'commit_oid': OID,
         'evidence_path': FILE,
         'evidence_sha256': hashlib.sha256(BODY.encode()).hexdigest(),
         'release_ref': spec['release_ref'],
@@ -71,6 +70,8 @@ def test_r7_pinned_publisher_proof_is_validated_without_changing_certification(d
     assert record['effect_on_certificate'] == 'NONE'
     assert record['publisher_proof']['publisher_wallet'] == WALLET
     assert record['publisher_proof']['independent_authority_verified'] is False
+    assert record['publisher_proof']['publisher_commit_oid'] == OID
+    assert 'commit_oid' not in json.loads(record['publisher_proof']['publisher_manifest_content'])
     assert contract.get_spec(sid) == before
     assert contract.get_publisher_attestation(cid,'COUNTER') == record
     assert direct_vm.run_validator() is True
@@ -80,6 +81,20 @@ def test_r7_wrong_manifest_digest_is_rejected(direct_vm, direct_deploy):
     contract, sid, cid = setup(direct_vm, direct_deploy)
     fixtures(direct_vm, contract.get_spec(sid), manifest_change={'evidence_sha256':'a'*64})
     with direct_vm.expect_revert('manifest not bound'):
+        contract.attest_github_evidence_publisher(cid, 'COUNTER')
+
+
+def test_r7_self_referential_v1_manifest_is_rejected(direct_vm, direct_deploy):
+    contract, sid, cid = setup(direct_vm, direct_deploy)
+    fixtures(
+        direct_vm,
+        contract.get_spec(sid),
+        manifest_change={
+            'schema': 'proofspec-github-evidence-publisher-v1',
+            'commit_oid': OID,
+        },
+    )
+    with direct_vm.expect_revert('Publisher evidence manifest schema invalid'):
         contract.attest_github_evidence_publisher(cid, 'COUNTER')
 
 

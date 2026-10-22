@@ -115,6 +115,14 @@ Expected:
 Write 11: `open_challenge`
 
 - new-host counter source materially contradicts the criterion.
+- counter URL is an immutable `raw.githubusercontent.com/<owner>/<repo>/<full-commit>/<path>` locator;
+- that evidence commit must be present in the repository's protected `main` ancestry;
+- its immutable evidence-authority manifest must bind the exact evidence path and SHA-256, nominated release ref, criterion SHA-256, publisher wallet, and `COUNTER` role;
+- the nominated release ref must be an immutable GitHub commit locator and the counter's release assessment must match that exact release.
+
+The evidence manifest uses schema `proofspec-github-evidence-publisher-v2`. It intentionally does not repeat `commit_oid`: the full commit OID is already bound by the immutable evidence URL, GitHub ancestry proof, and manifest fetched from that same commit. Requiring a manifest to contain the OID of its own containing commit would be self-referential because the manifest bytes contribute to that OID.
+
+These conditions are enforced by the deployed contract before an upheld counter can affect a certificate. A contradictory URL on a different host alone is not sufficient. If source availability, protected-main proof, manifest validation, exact-release binding, or validator agreement is missing, the expected safe result is `INSUFFICIENT`, not `UPHELD`.
 
 Write 12: `resolve_challenge`
 
@@ -126,6 +134,8 @@ Expected:
 - effective certificate becomes `INSUFFICIENT`;
 - direct flip to `VIOLATED`/`REJECTED` does not occur;
 - original authenticated snapshot remains preserved.
+
+An upheld result also records the verified publisher-manifest proof. The publisher proof is a GitHub repository-control check only; it does not prove factual correctness, independent ownership, or editorial independence.
 
 ## 6. Required evidence for every write
 

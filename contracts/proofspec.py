@@ -446,7 +446,7 @@ GITHUB_AUTHORITY_MANIFEST_PATH = "/.proofspec/authority.json"
 GITHUB_AUTHORITY_SCHEMA = "proofspec-github-protected-main-authority-v1"
 MAX_GITHUB_API_BYTES = 131072
 MAX_GITHUB_MANIFEST_BYTES = 4096
-GITHUB_EVIDENCE_AUTHORITY_SCHEMA = "proofspec-github-evidence-publisher-v1"
+GITHUB_EVIDENCE_AUTHORITY_SCHEMA = "proofspec-github-evidence-publisher-v2"
 GITHUB_EVIDENCE_MANIFEST_PATH = "/.proofspec/evidence-authority.json"
 
 
@@ -640,7 +640,7 @@ def _github_evidence_publisher_once(
     except Exception:
         raise gl.vm.UserError("[EXPECTED] Publisher evidence manifest malformed")
     required = {
-        "schema", "repository", "commit_oid", "evidence_path",
+        "schema", "repository", "evidence_path",
         "evidence_sha256", "release_ref", "criterion_sha256",
         "publisher_wallet", "role",
     }
@@ -653,7 +653,6 @@ def _github_evidence_publisher_once(
         raise gl.vm.UserError("[EXPECTED] Publisher wallet invalid")
     if (manifest["schema"] != GITHUB_EVIDENCE_AUTHORITY_SCHEMA
             or manifest["repository"] != repo
-            or manifest["commit_oid"] != oid
             or manifest["evidence_path"] != path
             or manifest["evidence_sha256"] != evidence["content_sha256"]
             or manifest["release_ref"] != spec["release_ref"]

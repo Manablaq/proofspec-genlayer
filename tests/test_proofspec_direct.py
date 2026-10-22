@@ -139,9 +139,8 @@ def mock_pinned_publisher(direct_vm, body, *, role="COUNTER",
                "base_commit":{"sha":commit},
                "merge_base_commit":{"sha":commit}}
     manifest = {
-        "schema":"proofspec-github-evidence-publisher-v1",
+        "schema":"proofspec-github-evidence-publisher-v2",
         "repository":repo,
-        "commit_oid":commit,
         "evidence_path":evidence_path,
         "evidence_sha256":hashlib.sha256(body.strip().encode()).hexdigest(),
         "release_ref":RELEASE_REF,
