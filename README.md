@@ -18,6 +18,10 @@ ProofSpec is a GenLayer-native application for proving whether a software releas
 
 See `docs/STUDIO_NEXT_ONLY_SUBMISSION_SCOPE.md` for the current release boundaries. Do not interpret the historical release-path and safety sections below as current promotion status.
 
+## Security correction discovered during transaction preflight (2026-10-22)
+
+The currently deployed R53 contract remains at source SHA-256 `c37479737913eb65e9585a403ae308c2a8395433895fa80d3c14a6b835fd4816`. A local candidate fixes a self-referential v1 evidence-publisher manifest by using schema v2 and relying on the immutable evidence URL plus protected-main ancestry to bind the commit OID. Candidate source SHA-256 is `a76a30802b7e6a647af5b50ba17bdd95862ee1b756f8f34d8e5e6edea9c85120`; it has passed focused local tests but is not merged or deployed. Do not use the current contract for the full challenge matrix until the candidate has passed the release gate and is deployed to a newly approved Studio Devnet instance. No Bradbury operation is in scope.
+
 ## Progress — Studio Next live checkpoint (2026-10-16)
 
 `PROOFSPEC_STUDIO_NEXT_LIVE=FINALIZED_CERTIFIED`; `PROOFSPEC_BRADBURY_CERTIFICATION=NOT_PERFORMED`.

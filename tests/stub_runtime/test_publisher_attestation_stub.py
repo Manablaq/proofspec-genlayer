@@ -45,7 +45,6 @@ def mock_api(m, spec, criterion, evidence, *, protected=True, ancestry=True,
     manifest = {
         'schema': m.GITHUB_EVIDENCE_AUTHORITY_SCHEMA,
         'repository': REPO,
-        'commit_oid': OID,
         'evidence_path': FILE,
         'evidence_sha256': evidence['content_sha256'],
         'release_ref': spec['release_ref'],
@@ -115,7 +114,7 @@ def test_r7_supported_correction_role_has_separate_proof():
     {'criterion_sha256': 'f'*64},
     {'evidence_path': 'some/other/file'},
     {'repository': 'OtherOrg/other'},
-    {'commit_oid': 'a'*40},
+    {'commit_oid': 'a'*40},  # rejected: the immutable locator already binds the commit OID
     {'publisher_wallet': 'not-a-wallet'},
     {'role': 'CORRECTION'},
     {'schema': 'unknown'},

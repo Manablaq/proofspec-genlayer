@@ -18,6 +18,10 @@ The October 16 record and transaction history below are preserved as historical 
 - Production deployment and live guest-read reconciliation are complete. Platform resubmission remains pending. Bradbury and the 12-write matrix were excluded by the recorded owner scope, **not passed**.
 - This amendment records the later authorized Git and Vercel actions; it does not authorize a wallet signature, transaction broadcast, contract redeployment, or Bradbury operation.
 
+## Publisher-manifest correction discovered during CLI preflight (2026-10-22)
+
+The live R53 contract at `0x2240176b5fBa877cfD015877b68981D4c47a3659` remains at source SHA-256 `c37479737913eb65e9585a403ae308c2a8395433895fa80d3c14a6b835fd4816`. Review of its verified-publisher challenge path found that the v1 manifest requires its own containing Git commit OID, a self-referential condition. The working-tree candidate changes the evidence manifest to v2 and removes only that redundant field; candidate SHA-256 is `a76a30802b7e6a647af5b50ba17bdd95862ee1b756f8f34d8e5e6edea9c85120`. Focused backend, Direct Mode, stub, typecheck, and GenVM lint checks pass. The candidate has not been merged, deployed, or tested against live consensus. Do not continue the old ten-write sequence on the deployed R53 address. A new deployment plus fresh 12-write plan is required; this note does not authorize either operation.
+
 ## Demonstrated
 
 - Source-hash-matched Intelligent Contract deployed to Studio Next (chain 61997).

@@ -1,6 +1,6 @@
 # Studio Next operator runbook
 
-Status: **Read-only preflight complete; Scenario A steps 1–2 matched to finalized history; 10 writes remain for the supplementary Studio Devnet run**
+Status: **HOLD — the deployed contract's publisher-manifest format is self-referential; a local source fix passed focused regressions, but is not deployed. Do not run the ten-write continuation against the current address.**
 Scope: **Studio Next / Studio Devnet only**
 This runbook does not authorize a wallet signature, transaction broadcast, deployment, funding, or any Bradbury operation.
 
@@ -25,6 +25,12 @@ Values recorded in the current owner scope document:
 | Required frontend mode | `PROOFSPEC_NETWORK=studio-dev`; `PROOFSPEC_E2E_MOCK` unset |
 
 These are expected bindings, not proof of the values currently displayed by Studio or served by the public frontend. The historical October 16 address `0xD11A506B363E131e8fA3eBeC28a21cC8a4375110` belongs to older contract bytes and must not be used for this current-source run.
+
+### Newly discovered deployment blocker (2026-10-22)
+
+The current on-chain address above still runs contract source SHA-256 `c37479737913eb65e9585a403ae308c2a8395433895fa80d3c14a6b835fd4816`. In that source, `proofspec-github-evidence-publisher-v1` requires its manifest to contain the same commit OID as the commit that contains the manifest. Since those manifest bytes are part of that commit, the requirement is self-referential and cannot be satisfied by an ordinary Git commit. This prevents the intended verified-publisher challenge path from completing on the existing instance.
+
+The local candidate removes only that redundant manifest field, keeps the commit OID bound by the immutable raw URL and protected-main ancestry checks, and bumps the manifest schema to v2. Candidate source SHA-256: `a76a30802b7e6a647af5b50ba17bdd95862ee1b756f8f34d8e5e6edea9c85120`. Local backend static/deterministic gate (68 tests), full Direct Mode suite (84 tests), and stub-runtime suite (85 tests), plus typecheck and GenVM lint, pass; no new deployment or live consensus test has been performed. Do not send any of the ten remaining calls to the old address. A fresh deployment and fresh 12-write fixture plan would be required; deployment/broadcast remains subject to scoped approval.
 
 ## Read-only preflight result (2026-10-22)
 
@@ -52,15 +58,15 @@ An independent SHA-256 and snapshot-ID calculation over the exact stored `snapsh
 
 Important CLI distinction: the installed `genlayer call` 0.39.2 command queried `latest-nonfinal` and surfaced `malformed_entry` on these view calls. The frontend's SDK read with `LATEST_FINAL` succeeded. The CLI output was therefore not evidence that the contract's finalized read methods are broken. Use the pinned frontend SDK/finalized view path for this preflight.
 
-**Current plan:** this is not a zero-count deployment. The existing specification is a match for Scenario A steps 1–2, so a transparently reconciled Studio Devnet run can continue at step 3 and finish steps 3–12, ending with four specifications and two challenges if every write succeeds as expected. The 12-write matrix remains unexecuted as a whole, and its Bradbury certification target is unchanged. Before any signature, recheck current finalized counts/state and the Studio network, freeze all remaining scenario fixtures and exact arguments, and accept/document the missing raw response gap for steps 1–2. If spec 1 no longer matches the recorded state or the operator requires complete raw journaling, stop; do not deploy a replacement or add writes without a separately approved plan. No deployment or write was made during this preflight.
+**Current plan — HOLD:** the one specification and zero challenges above are finalized state on the *old* contract only. The former suggestion to resume at step 3 is withdrawn because the old contract cannot satisfy Scenario D's verified-publisher path. Do not transact against that address. A newly approved deployment of the v2 candidate would start from zero specifications and zero challenges and require a new, fully frozen 12-write run. The Bradbury certification target remains unchanged and out of scope. No deployment or write has been made for this candidate.
 
 ## Before the first signature
 
 1. Open the intended Studio Next workspace and verify the displayed network is Studio Devnet / chain `61997`. Do not use Bradbury or Studionet for this run.
 2. Verify the connected wallet address and that it is the intended submitter. Record the full address; never paste a seed phrase or private key into the journal.
-3. Verify the contract address and deployment fingerprint against the table above. Read `get_protocol_info`, `get_spec_count`, and `get_challenge_count` with the pinned GenLayer SDK and `LATEST_FINAL`; save the raw results. The expected continuation state is one spec and zero challenges, with spec 1 still matching Scenario A steps 1–2. Stop on any difference. The expected final totals remain four specs and two challenges.
+3. Only after an explicitly approved v2 Studio Devnet deployment, verify its new address and source fingerprint. Read `get_protocol_info`, `get_spec_count`, and `get_challenge_count` with the pinned GenLayer SDK and `LATEST_FINAL`; save the raw results. Expected starting counts for that fresh instance are zero specs and zero challenges. Plan all 12 matrix writes from Scenario A step 1; do not carry over spec 1 or transaction history from the old address.
 4. Freeze the release labels, immutable `release_ref` values, criterion text, policy, freshness policy, and every source URL below. URLs must be real, accessible HTTPS sources suitable for the exact criterion. Record the fetched content/version and independently establish what each fixture supports or contradicts. For the unavailable case, record evidence that the URL is intentionally unavailable and do not imply it is an authentic snapshot.
-5. Confirm from current Studio method forms that the ABI matches `contracts/proofspec.py`; use `docs/CONTRACT_SPEC.md` and the exact method signatures listed below. Estimate/inspect fees in the UI. Do not assume a numeric value unit or enter a guessed payable amount; these calls are nonpayable unless Studio clearly indicates otherwise.
+5. Confirm from current Studio method forms that the ABI matches `contracts/proofspec.py`; use `docs/CONTRACT_SPEC.md` and the exact method signatures listed below. The installed GenLayer CLI 0.39.2 `estimate-fees` command was tested read-only and reported that the active client does not support simulation-derived fee estimates. Do not treat that as a zero-fee estimate or guess a `--fee-value`; these contract methods are nonpayable. For CLI writes, omit `--fee-value` so the client derives the deposit from the configured FeeManager/Studio path, and record the actual submitted value and eventual fee from the receipt. If the Studio UI or client cannot show the derived amount before signing, disclose that uncertainty in the scoped transaction approval and do not claim a pre-sign exact fee quote.
 6. Create a local evidence journal from the worksheet below. Save screenshots and raw responses without wallet secrets. No write is eligible until its arguments and expected post-state are filled in and reviewed by the operator.
 
 ### Fixture freeze worksheet (complete before signing)
@@ -74,9 +80,9 @@ Important CLI distinction: the installed `genlayer call` 0.39.2 command queried 
 | C1 corroborating, distinct host | `TO BE FROZEN` | Same proposition as C1 | `TO BE FROZEN` | Contradicts |
 | C2 primary | `TO BE FROZEN` | `TO BE FROZEN` | `TO BE FROZEN` | Intentionally unavailable |
 | D primary | `TO BE FROZEN` | `TO BE FROZEN` | `TO BE FROZEN` | Supports |
-| D challenge counter, distinct host | `TO BE FROZEN` | Same proposition as D | `TO BE FROZEN` | Materially contradicts |
+| D challenge counter | `TO BE FROZEN` | Same proposition as D | Must be an immutable raw GitHub URL on a protected-main descendant commit. Its commit's evidence-authority manifest must bind the exact file path and content SHA-256, D's exact release ref, criterion SHA-256, publisher wallet, and `COUNTER` role. The release ref itself must be an immutable GitHub commit locator. | Materially contradicts; expected `UPHELD` only if every contract-side publisher and exact-release proof succeeds |
 
-Distinct hosts only establish the contract's host-diversity condition; they do not establish independent ownership or factual independence. Use controlled fixtures only when clearly disclosed as controlled fixtures. The deployed adjudicator's interpretation is not guaranteed by the fixture author's expected result.
+Distinct hosts only establish the contract's host-diversity condition; they do not establish independent ownership or factual independence. A distinct-host counter URL alone cannot produce Scenario D's expected `UPHELD` result on the deployed contract: `contracts/proofspec.py` requires the counter to be bound to the exact immutable release and to pass GitHub protected-main ancestry, pinned evidence-manifest, content-hash, role, and wallet validation. A missing or mismatched proof safely yields `INSUFFICIENT`. Use controlled fixtures only when clearly disclosed as controlled fixtures. The deployed adjudicator's interpretation is not guaranteed by the fixture author's expected result.
 
 ## Write sequence and stop gates
 
