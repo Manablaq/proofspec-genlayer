@@ -1,8 +1,8 @@
 # ProofSpec Release Gates
 
-Status: **Progress 5/7 Studio Devnet compatibility evidence captured; Progress 6/7 Bradbury certification not performed; Progress 7/7 release/submission certification incomplete.**
+Status: **Progress 4/7 local frontend checks and public guest-read verification passed; Progress 5/7 Studio Devnet compatibility evidence is partial; Progress 6/7 Bradbury certification not performed; Progress 7/7 submission certification incomplete.**
 
-The current R53 Studio Devnet deployment and its finalized create/evaluate lifecycle are recorded in `docs/STUDIO_NEXT_OPERATOR_RUNBOOK.md`. This is bounded, resettable-network compatibility evidence. The frozen Bradbury matrix remains excluded by the owner-scoped submission decision and has not passed. Production promotion, live guest-read reconciliation, clean-commit release binding, and final submission evidence remain open.
+The current R53 Studio Devnet deployment and its finalized create/evaluate lifecycle are recorded in `docs/STUDIO_NEXT_OPERATOR_RUNBOOK.md`. This is bounded, resettable-network compatibility evidence. The ProofSpec frontend is merged to `main` and deployed READY to Production from commit `08f49c28075d7d0609acadff6e2cb1b440698ac1`; the live runtime configuration and unauthenticated guest read of spec 1 were verified on 2026-10-22. The frozen Bradbury matrix remains excluded by the recorded owner scope and has not passed. Ten supplementary Studio Devnet writes, full Bradbury certification, final evidence packaging, and platform resubmission remain open.
 
 ProofSpec uses seven sequential gates. A later gate cannot be marked complete because an earlier one is "probably fine."
 
