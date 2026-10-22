@@ -62,9 +62,20 @@ export type SpecRecord = {
   effective_certificate_result: string;
   criteria: CriterionRecord[];
   revision: number;
+  reconsideration_count: number;
   challenge_count: number;
   latest_challenge_id: number;
   pending_challenge_id: number;
+  release_provenance: ReleaseProvenance;
+};
+
+export type ReleaseProvenance = {
+  assessment_class: string;
+  reference_kind: string;
+  maintainer_authorized: boolean;
+  submitter_authority_status: string;
+  reference_existence_verified: boolean;
+  reference_repo_reachability_verified: boolean;
 };
 
 export type ChallengeRecord = {
@@ -94,6 +105,20 @@ export type ChallengeRecord = {
   counter_snapshot_id: string;
   counter_content_sha256: string;
   counter_content_length: number;
+  expires_at: number;
+  counts_toward_challenge_limit: boolean;
+  upheld_revision: number;
+};
+
+export type ChallengeCorrection = {
+  challenge_id: number;
+  spec_id: number;
+  requested_by: string;
+  basis_revision: number;
+  outcome: "RESTORED" | "NOT_RESTORED";
+  result_revision: number;
+  rationale: string;
+  rebuttal_snapshot_id: string;
 };
 
 export type EvidenceSnapshot = {
@@ -114,7 +139,11 @@ export type WriteIntent =
   | { kind: "create_spec"; functionName: "create_spec"; args: [string, string, string]; summary: string }
   | { kind: "evaluate_spec"; functionName: "evaluate_spec"; args: [number]; summary: string }
   | { kind: "open_challenge"; functionName: "open_challenge"; args: [number, number, string, string]; summary: string }
-  | { kind: "resolve_challenge"; functionName: "resolve_challenge"; args: [number]; summary: string };
+  | { kind: "resolve_challenge"; functionName: "resolve_challenge"; args: [number]; summary: string }
+  | { kind: "authorize_github_release"; functionName: "authorize_github_release"; args: [number]; summary: string }
+  | { kind: "reconsider_insufficient_spec"; functionName: "reconsider_insufficient_spec"; args: [number]; summary: string }
+  | { kind: "expire_challenge"; functionName: "expire_challenge"; args: [number]; summary: string }
+  | { kind: "reconsider_upheld_challenge"; functionName: "reconsider_upheld_challenge"; args: [number, string, string]; summary: string };
 
 export type WritePhase =
   | "idle"

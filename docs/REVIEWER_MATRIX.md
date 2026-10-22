@@ -1,6 +1,6 @@
 # ProofSpec Reviewer Matrix
 
-Status: **Progress 1/7 specification freeze**
+Status: **Frozen plan; live Bradbury matrix NOT EXECUTED**
 
 This file freezes the shape of the final reviewer demonstration before implementation. Exact fixture URLs, contract address, transaction IDs, source hashes, fee profile, and release commit will be filled only after those values exist.
 

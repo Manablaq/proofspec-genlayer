@@ -11,7 +11,8 @@ ProofSpec is a GenLayer-native application for proving whether a software releas
 - Current frozen Intelligent Contract: `contracts/proofspec.py` SHA-256 `c37479737913eb65e9585a403ae308c2a8395433895fa80d3c14a6b835fd4816`.
 - Current Studio Devnet (chain `61997`) contract: `0x2240176b5fBa877cfD015877b68981D4c47a3659`; RPC `https://studio-dev.genlayer.com/api`.
 - Deployment transaction `0x4a3ef9d5a41693c6346d08a94c68231837e8a1c972c5725ead4f49e480cab228` was reconciled as FINALIZED / FINISHED_WITH_RETURN. R60 read-only compatibility checks passed; counts at that checkpoint were zero specifications and zero challenges.
-- Frontend: R69 local certification passed (20/20 unit tests, 12/12 mock-RPC/browser E2E, typecheck, lint, build and zero reported high-or-higher production dependency vulnerabilities). R71 Vercel Preview runtime binding passed at commit `b471bf493b6d6a551f51ebfb951b0d812e834cfa`. R72 verified three separate encrypted, Production-only variables with correct values.
+- Frontend: the R69 (20/20 unit tests, 12/12 mock-RPC/browser E2E, typecheck, lint, build and zero high-or-higher production dependency advisories) and R71/R72 Vercel records apply to their recorded earlier source state only. The current checked-out commit is `1d50546048ef8b3957d538969f0b7e9963f4c9c9`; the reviewer-response frontend changes in this working tree are not yet certified or deployed. See `docs/REVIEW_RESPONSE_2026-10-21.md` for the current verification boundary.
+- Current Studio Devnet read-only reconciliation found one finalized specification and zero challenges. Spec 1 matches Scenario A steps 1–2 of the reviewer matrix; the remaining ten writes are not authorized or performed. See `docs/STUDIO_NEXT_OPERATOR_RUNBOOK.md` for the evidence and safe manual continuation gates.
 - **Not yet completed:** merge to GitHub `main`, a new Production deployment, Production runtime and finalized guest-read certification, a live R53 write lifecycle, Bradbury persistent certification, and the 12-write reviewer matrix. The owner elected Studio Devnet-only submission; reviewer acceptance is not guaranteed.
 - The historical October 16 contract `0xD11A506B363E131e8fA3eBeC28a21cC8a4375110` used older contract source and had a *separate* certified evaluation. That certificate **must not** be attributed to the current R53 contract.
 
@@ -86,6 +87,6 @@ Studio-dev is treated as temporary release-candidate infrastructure. Bradbury is
 
 ## Safety boundary
 
-The committed repository remains at Progress 3. The present uncommitted candidate additionally includes the locally certified Progress 4 frontend. That local certification does not establish hosted-network finality or reviewer readiness.
+The current checkout is `1d50546048ef8b3957d538969f0b7e9963f4c9c9`. Any reviewer-response edits in the working tree are uncommitted and have no hosted-network or reviewer certification. This statement replaces earlier checkout-status wording; historical progress reports remain records of their specific source snapshots.
 
 Any later frontend implementation, deployment, funding, signing, blockchain write, Vercel mutation, environment-variable mutation, domain mutation, Git history rewrite, or release promotion requires its own scoped gate and authorization.

@@ -163,8 +163,13 @@ def mock_pinned_publisher(direct_vm, body, *, role="COUNTER",
         direct_vm.mock_web(pattern, {"status": 200, "body": value})
 
 
-def mock_counter(direct_vm, body):
-    mock_pinned_publisher(direct_vm, body)
+def mock_counter(direct_vm, body, *, publisher=False):
+    # Publisher API mocks are needed only for paths that can uphold a claim.
+    # Rejected and unavailable evidence must not appear to consult authority.
+    if publisher and body:
+        mock_pinned_publisher(direct_vm, body)
+    else:
+        direct_vm.mock_web(COUNTER_PATTERN, {"status": 200, "body": body})
 
 
 def create_single_spec(
@@ -793,7 +798,7 @@ def test_upheld_challenge_downgrades_satisfied_criterion_to_insufficient(
     )
     challenge_id = open_challenge(contract, spec_id)
     mock_primary(direct_vm, "ORIGINAL_PRIMARY_EVIDENCE")
-    mock_counter(direct_vm, "Counter evidence contradicts the requirement.")
+    mock_counter(direct_vm, "Counter evidence contradicts the requirement.", publisher=True)
     direct_vm.mock_llm(
         r"PROOFSPEC_CHALLENGE_V1",
         challenge_payload(counter_assessment="CONTRADICTS"),
@@ -841,7 +846,7 @@ def test_supporting_counter_upholds_challenge_against_violated_criterion(
     )
     challenge_id = open_challenge(contract, spec_id)
     mock_primary(direct_vm, "ORIGINAL_PRIMARY_CONTRADICTION")
-    mock_counter(direct_vm, "Counter evidence supports the requirement.")
+    mock_counter(direct_vm, "Counter evidence supports the requirement.", publisher=True)
     direct_vm.mock_llm(
         r"PROOFSPEC_CHALLENGE_V1",
         challenge_payload(counter_assessment="SUPPORTS"),
@@ -917,7 +922,7 @@ def test_challenge_uses_authenticated_snapshot_when_live_original_changes(
     challenge_id = open_challenge(contract, spec_id)
 
     mock_primary(direct_vm, mutated)
-    mock_counter(direct_vm, "Counter evidence contradicts the requirement.")
+    mock_counter(direct_vm, "Counter evidence contradicts the requirement.", publisher=True)
     direct_vm.mock_llm(
         r"(?s)^PROOFSPEC_CHALLENGE_V1(?=.*ORIGINAL_AUTHENTICATED_PRIMARY)(?!.*MUTATED_LIVE_PRIMARY).*",
         challenge_payload(counter_assessment="CONTRADICTS"),
@@ -982,7 +987,7 @@ def test_challenge_validator_rejects_counter_direction_disagreement(
 
     direct_vm.clear_mocks()
     mock_primary(direct_vm, "ORIGINAL_PRIMARY_EVIDENCE")
-    mock_counter(direct_vm, "stable counter evidence")
+    mock_counter(direct_vm, "stable counter evidence", publisher=True)
     direct_vm.mock_llm(
         r"PROOFSPEC_CHALLENGE_V1",
         challenge_payload(counter_assessment="CONTRADICTS", rationale="validator"),
@@ -1082,7 +1087,7 @@ def test_release_bound_matching_counter_can_uphold_challenge(
     )
     challenge_id = open_challenge(contract, spec_id)
     mock_primary(direct_vm, original)
-    mock_counter(direct_vm, "Matching-release counter evidence contradicts requirement.")
+    mock_counter(direct_vm, "Matching-release counter evidence contradicts requirement.", publisher=True)
     direct_vm.mock_llm(
         r"PROOFSPEC_CHALLENGE_V1",
         challenge_payload(

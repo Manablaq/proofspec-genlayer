@@ -46,7 +46,7 @@ def test_upheld_counter_consumes_exactly_one_qualified_slot(direct_vm, direct_de
     contract, spec_id, _ = evaluate_directional_spec(direct_vm, direct_deploy)
     challenge_id = open_challenge(contract, spec_id)
     mock_primary(direct_vm, "ORIGINAL_PRIMARY_EVIDENCE")
-    mock_counter(direct_vm, "Counter evidence contradicts this release requirement.")
+    mock_counter(direct_vm, "Counter evidence contradicts this release requirement.", publisher=True)
     direct_vm.mock_llm(
         r"PROOFSPEC_CHALLENGE_V1",
         challenge_payload(counter_assessment="CONTRADICTS"),

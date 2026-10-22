@@ -7,6 +7,7 @@ import { WriteReviewDialog } from "@/components/WriteReviewDialog";
 import { useProofSpec } from "@/components/ProofSpecProvider";
 import { shortAddress, shortHash } from "@/lib/format";
 import type {
+  ChallengeCorrection,
   ChallengeRecord,
   EvidenceSnapshot,
   SpecRecord,
@@ -27,14 +28,18 @@ export function SpecClient({ specId }: { specId: number }) {
 
   const [spec, setSpec] = useState<SpecRecord | null>(null);
   const [challenges, setChallenges] = useState<ChallengeRecord[]>([]);
+  const [corrections, setCorrections] = useState<Record<number, ChallengeCorrection | null>>({});
   const [snapshot, setSnapshot] = useState<EvidenceSnapshot | null>(null);
   const [snapshotVerified, setSnapshotVerified] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
+  const [observedAtMs, setObservedAtMs] = useState<number | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
   const [intent, setIntent] = useState<WriteIntent | null>(null);
   const [counterUrl, setCounterUrl] = useState("");
   const [challengeNote, setChallengeNote] = useState("");
   const [criterionId, setCriterionId] = useState(1);
+  const [rebuttalUrls, setRebuttalUrls] = useState<Record<number, string>>({});
+  const [correctionNotes, setCorrectionNotes] = useState<Record<number, string>>({});
 
   const load = useCallback(async () => {
     if (!gateway) return;
@@ -44,6 +49,7 @@ export function SpecClient({ specId }: { specId: number }) {
     try {
       const loaded = await gateway.getSpec(specId);
       setSpec(loaded);
+      setObservedAtMs(Date.now());
 
       const items: ChallengeRecord[] = [];
       for (let id = 1; id <= loaded.latest_challenge_id; id += 1) {
@@ -55,6 +61,14 @@ export function SpecClient({ specId }: { specId: number }) {
         }
       }
       setChallenges(items);
+      const correctionEntries = await Promise.all(items.map(async (item) => {
+        try {
+          return [item.id, await gateway.getChallengeCorrection(item.id)] as const;
+        } catch {
+          return [item.id, null] as const;
+        }
+      }));
+      setCorrections(Object.fromEntries(correctionEntries));
     } catch (caught) {
       setPageError(
         caught instanceof Error ? caught.message : "Unable to load finalized certificate."
@@ -130,6 +144,18 @@ export function SpecClient({ specId }: { specId: number }) {
 
       {spec ? (
         <>
+          <section className="callout warning" aria-label="Release provenance classification">
+            <strong>
+              {spec.release_provenance?.maintainer_authorized
+                ? "Maintainer-authorized release assessment"
+                : "Self-submitted consensus assessment"}
+            </strong>
+            <span>
+              {spec.release_provenance?.maintainer_authorized
+                ? "A protected-main manifest and wallet binding were verified by consensus. This authenticates the release maintainer claim, not the truth or independence of evidence."
+                : "The submitter has not proven maintainer authority for this release. Host diversity is not proof of independent ownership or factual corroboration."}
+            </span>
+          </section>
           <section className="certificate-hero">
             <div>
               <p className="eyebrow">Specification #{spec.id}</p>
@@ -256,6 +282,76 @@ export function SpecClient({ specId }: { specId: number }) {
                       <small>
                         Criterion {challenge.criterion_id} · {challenge.counter_host} · {challenge.state}
                       </small>
+                      {corrections[challenge.id] ? (
+                        <p className="helper" data-testid={`correction-${challenge.id}`}>
+                          Bounded correction: {corrections[challenge.id]?.outcome} · revision {corrections[challenge.id]?.result_revision}. {corrections[challenge.id]?.rationale}
+                        </p>
+                      ) : null}
+                      {challenge.state === "PENDING" && spec.pending_challenge_id === challenge.id ? (
+                        <div className="stack-form">
+                          <p className="helper">
+                            Timeout recovery becomes available after the on-chain deadline ({new Date(challenge.expires_at * 1000).toLocaleString()}). It releases the pending slot without changing the certificate.
+                          </p>
+                          <button
+                            className="button button-secondary"
+                            disabled={Boolean(pendingWrite) || observedAtMs === null || observedAtMs < challenge.expires_at * 1000}
+                            onClick={() => {
+                              clearWriteState();
+                              setIntent({
+                                kind: "expire_challenge",
+                                functionName: "expire_challenge",
+                                args: [challenge.id],
+                                summary: `Expire timed-out pending challenge #${challenge.id}`
+                              });
+                            }}
+                          >
+                            Review expired-challenge recovery
+                          </button>
+                        </div>
+                      ) : null}
+                      {challenge.state === "RESOLVED" && challenge.challenge_outcome === "UPHELD" &&
+                      spec.effective_certificate_result === "INSUFFICIENT" &&
+                      spec.revision === challenge.upheld_revision &&
+                      spec.pending_challenge_id === 0 &&
+                      !corrections[challenge.id] &&
+                      walletAddress?.toLowerCase() === spec.submitter.toLowerCase() ? (
+                        <div className="stack-form">
+                          <label>
+                            <span>Distinct-host rebuttal evidence URL</span>
+                            <input
+                              value={rebuttalUrls[challenge.id] || ""}
+                              onChange={(event) => setRebuttalUrls((current) => ({ ...current, [challenge.id]: event.target.value }))}
+                              placeholder="https://new-host.example/immutable-evidence"
+                            />
+                          </label>
+                          <label>
+                            <span>Correction explanation</span>
+                            <textarea
+                              value={correctionNotes[challenge.id] || ""}
+                              onChange={(event) => setCorrectionNotes((current) => ({ ...current, [challenge.id]: event.target.value }))}
+                              maxLength={600}
+                            />
+                          </label>
+                          <p className="helper">
+                            One correction attempt only. A supporting link alone cannot restore the certificate; the rebuttal and upheld counterevidence are re-assessed against this exact release.
+                          </p>
+                          <button
+                            className="button button-primary"
+                            disabled={Boolean(pendingWrite) || !(rebuttalUrls[challenge.id] || "").startsWith("https://") || !(correctionNotes[challenge.id] || "").trim()}
+                            onClick={() => {
+                              clearWriteState();
+                              setIntent({
+                                kind: "reconsider_upheld_challenge",
+                                functionName: "reconsider_upheld_challenge",
+                                args: [challenge.id, rebuttalUrls[challenge.id].trim(), correctionNotes[challenge.id].trim()],
+                                summary: `Request the single bounded correction for upheld challenge #${challenge.id}`
+                              });
+                            }}
+                          >
+                            Review bounded correction
+                          </button>
+                        </div>
+                      ) : null}
                     </article>
                   ))}
                 </div>
@@ -277,21 +373,68 @@ export function SpecClient({ specId }: { specId: number }) {
               ) : null}
 
               {spec.state === "PENDING" ? (
-                <button
-                  className="button button-primary full"
-                  disabled={!walletAddress || Boolean(pendingWrite)}
-                  onClick={() => {
-                    clearWriteState();
-                    setIntent({
-                      kind: "evaluate_spec",
-                      functionName: "evaluate_spec",
-                      args: [spec.id],
-                      summary: `Evaluate specification #${spec.id}`
-                    });
-                  }}
-                >
-                  Review evaluation
-                </button>
+                <>
+                  {spec.release_provenance?.reference_kind === "GITHUB_CONTENT_ADDRESSED_COMMIT_LOCATOR" &&
+                  !spec.release_provenance?.maintainer_authorized &&
+                  walletAddress?.toLowerCase() === spec.submitter.toLowerCase() ? (
+                    <button
+                      className="button button-secondary full"
+                      disabled={Boolean(pendingWrite)}
+                      onClick={() => {
+                        clearWriteState();
+                        setIntent({
+                          kind: "authorize_github_release",
+                          functionName: "authorize_github_release",
+                          args: [spec.id],
+                          summary: `Verify protected-main maintainer authority for specification #${spec.id}`
+                        });
+                      }}
+                    >
+                      Review maintainer authorization
+                    </button>
+                  ) : null}
+                  <button
+                    className="button button-primary full"
+                    disabled={!walletAddress || Boolean(pendingWrite)}
+                    onClick={() => {
+                      clearWriteState();
+                      setIntent({
+                        kind: "evaluate_spec",
+                        functionName: "evaluate_spec",
+                        args: [spec.id],
+                        summary: `Evaluate specification #${spec.id}`
+                      });
+                    }}
+                  >
+                    Review evaluation
+                  </button>
+                </>
+              ) : null}
+
+              {spec.state === "EVALUATED" &&
+              spec.effective_certificate_result === "INSUFFICIENT" &&
+              spec.reconsideration_count < 2 &&
+              walletAddress?.toLowerCase() === spec.submitter.toLowerCase() ? (
+                <div className="stack-form">
+                  <p className="helper">
+                    Only criteria that were originally INSUFFICIENT can be rechecked. The original certificate and decision history remain recorded; at most two reconsiderations are allowed.
+                  </p>
+                  <button
+                    className="button button-primary full"
+                    disabled={Boolean(pendingWrite) || spec.pending_challenge_id !== 0}
+                    onClick={() => {
+                      clearWriteState();
+                      setIntent({
+                        kind: "reconsider_insufficient_spec",
+                        functionName: "reconsider_insufficient_spec",
+                        args: [spec.id],
+                        summary: `Reconsider originally insufficient evidence for specification #${spec.id} (${spec.reconsideration_count + 1}/2)`
+                      });
+                    }}
+                  >
+                    Review bounded reconsideration
+                  </button>
+                </div>
               ) : null}
 
               {canChallenge ? (

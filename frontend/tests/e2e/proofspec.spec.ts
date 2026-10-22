@@ -20,6 +20,21 @@ async function resetMock(request: APIRequestContext) {
   });
 }
 
+async function seedMockScenario(
+  request: APIRequestContext,
+  scenario: "insufficient-reconsideration" | "expired-challenge" | "upheld-correction" | "release-authorization"
+) {
+  const response = await request.post("/api/mock-rpc", {
+    data: {
+      jsonrpc: "2.0",
+      id: 2,
+      method: "proofspec_seedScenario",
+      params: [scenario, account]
+    }
+  });
+  expect(response.ok(), await response.text()).toBeTruthy();
+}
+
 async function installMockWallet(page: Page) {
   await page.addInitScript(
     ({ walletAccount, hash }) => {
@@ -172,6 +187,96 @@ test("wallet-assisted create write is reviewed, duplicate-locked, finalized, and
   const payload = await debug.json();
   expect(payload.result.txCount).toBe(1);
   expect(payload.result.specCount).toBe(2);
+});
+
+test("submitter can reconsider an insufficient certificate through the reviewed write flow", async ({
+  page,
+  request
+}) => {
+  await seedMockScenario(request, "insufficient-reconsideration");
+  await installMockWallet(page);
+  await page.goto("/spec/1");
+  await page.getByRole("button", { name: "Connect wallet" }).click();
+  await expect(page.getByTestId("wallet-address")).toBeVisible();
+
+  await expect(page.getByText("INSUFFICIENT").first()).toBeVisible();
+  await page.getByRole("button", { name: "Review bounded reconsideration" }).click();
+  const dialog = page.getByRole("dialog", { name: "Review transaction" });
+  await expect(dialog).toContainText("reconsider_insufficient_spec");
+  await page.getByTestId("confirm-write").click();
+  await expect(dialog).toContainText("Finalized");
+  await page.getByRole("button", { name: "Done" }).click();
+  await expect(page.getByText("CERTIFIED").first()).toBeVisible();
+  await expect(page.locator(".certificate-result")).toContainText("Revision 2");
+});
+
+test("expired pending challenge can be permissionlessly released without changing the certificate", async ({
+  page,
+  request
+}) => {
+  await seedMockScenario(request, "expired-challenge");
+  await installMockWallet(page);
+  await page.goto("/spec/1");
+  await page.getByRole("button", { name: "Connect wallet" }).click();
+  await expect(page.getByTestId("wallet-address")).toBeVisible();
+
+  await expect(page.locator(".certificate-result")).toContainText("CERTIFIED");
+  await page.getByRole("button", { name: "Review expired-challenge recovery" }).click();
+  const dialog = page.getByRole("dialog", { name: "Review transaction" });
+  await expect(dialog).toContainText("expire_challenge");
+  await page.getByTestId("confirm-write").click();
+  await expect(dialog).toContainText("Finalized");
+  await page.getByRole("button", { name: "Done" }).click();
+
+  await expect(page.locator(".metadata-grid")).toContainText("Pending challenge");
+  await expect(page.locator(".metadata-grid")).toContainText("None");
+  await expect(page.getByText("INSUFFICIENT").first()).toBeVisible();
+  await expect(page.locator(".certificate-result")).toContainText("CERTIFIED");
+});
+
+test("one upheld challenge correction restores the original result and records its revision", async ({
+  page,
+  request
+}) => {
+  await seedMockScenario(request, "upheld-correction");
+  await installMockWallet(page);
+  await page.goto("/spec/1");
+  await page.getByRole("button", { name: "Connect wallet" }).click();
+  await expect(page.getByTestId("wallet-address")).toBeVisible();
+
+  await page.getByLabel("Distinct-host rebuttal evidence URL").fill("https://rebuttal.example/immutable-proof");
+  await page.getByLabel("Correction explanation").fill("This immutable rebuttal identifies the exact release and requirement.");
+  await page.getByRole("button", { name: "Review bounded correction" }).click();
+  const dialog = page.getByRole("dialog", { name: "Review transaction" });
+  await expect(dialog).toContainText("reconsider_upheld_challenge");
+  await page.getByTestId("confirm-write").click();
+  await expect(dialog).toContainText("Finalized");
+  await page.getByRole("button", { name: "Done" }).click();
+
+  await expect(page.getByText("CERTIFIED").first()).toBeVisible();
+  await expect(page.locator(".certificate-result")).toContainText("Revision 3");
+  await expect(page.getByTestId("correction-1")).toContainText("RESTORED");
+});
+
+test("maintainer authorization is presented as provenance, not as proof of evidence truth", async ({
+  page,
+  request
+}) => {
+  await seedMockScenario(request, "release-authorization");
+  await installMockWallet(page);
+  await page.goto("/spec/1");
+  await page.getByRole("button", { name: "Connect wallet" }).click();
+  await expect(page.getByTestId("wallet-address")).toBeVisible();
+
+  await page.getByRole("button", { name: "Review maintainer authorization" }).click();
+  const dialog = page.getByRole("dialog", { name: "Review transaction" });
+  await expect(dialog).toContainText("authorize_github_release");
+  await page.getByTestId("confirm-write").click();
+  await expect(dialog).toContainText("Finalized");
+  await page.getByRole("button", { name: "Done" }).click();
+
+  await expect(page.getByText("Maintainer-authorized release assessment")).toBeVisible();
+  await expect(page.getByText(/not the truth or independence of evidence/)).toBeVisible();
 });
 
 test("mobile layout remains usable and keyboard focus reaches primary navigation", async ({

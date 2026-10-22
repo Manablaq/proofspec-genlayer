@@ -17,7 +17,7 @@ def _upheld(direct_vm, direct_deploy):
     )
     cid = open_challenge(contract, sid)
     mock_primary(direct_vm, 'ORIGINAL_PRIMARY_EVIDENCE')
-    mock_counter(direct_vm, 'Counter says requirement is absent in release-commit-0123456789abcdef')
+    mock_counter(direct_vm, 'Counter says requirement is absent in release-commit-0123456789abcdef', publisher=True)
     direct_vm.mock_llm(
         r'PROOFSPEC_CHALLENGE_V1',
         challenge_payload(counter_assessment='CONTRADICTS',

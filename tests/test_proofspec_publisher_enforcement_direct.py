@@ -42,7 +42,7 @@ def _assessment(direct_vm):
 
 def test_r8_verified_proof_required_for_upheld(direct_vm, direct_deploy):
     contract, sid, cid = _pending(direct_vm, direct_deploy)
-    mock_counter(direct_vm, BODY)
+    mock_counter(direct_vm, BODY, publisher=True)
     _assessment(direct_vm)
     decision = contract.resolve_challenge(cid)
     assert decision["challenge_outcome"] == "UPHELD"
@@ -85,7 +85,7 @@ def test_r8_non_github_counter_cannot_uphold(direct_vm, direct_deploy):
 
 def test_r8_validator_rejects_changed_publisher_manifest(direct_vm, direct_deploy):
     contract, sid, cid = _pending(direct_vm, direct_deploy)
-    mock_counter(direct_vm, BODY)
+    mock_counter(direct_vm, BODY, publisher=True)
     _assessment(direct_vm)
     contract.resolve_challenge(cid)
     direct_vm.clear_mocks()
