@@ -18,7 +18,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             {children}
             <footer>
               <span>ProofSpec · bounded evidence, explicit uncertainty.</span>
-              <span>Progress 4 local frontend candidate</span>
+              <span>Built on GenLayer · evidence-first release certification</span>
             </footer>
           </div>
         </ProofSpecProvider>
